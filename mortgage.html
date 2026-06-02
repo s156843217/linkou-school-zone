@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>房貸試算 — 林口置產工具箱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* 計算模組版面 */
+  .calc-panel{padding:22px 22px 24px}
+  .module-header{margin-bottom:18px}
+  .module-title{font-family:var(--serif);font-weight:900;font-size:17px;color:var(--ink);
+    margin-bottom:5px;display:flex;align-items:center;gap:8px}
+  .module-title .dot{width:9px;height:9px;border-radius:50%;background:var(--clay);flex-shrink:0}
+  .module-desc{font-size:13px;color:var(--ink-soft)}
+
+  /* 輸入列 */
+  .calc-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+  .calc-row .field{flex:1 1 200px}
+
+  /* 數字輸入去除上下箭頭 */
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+
+  /* 寬限期 toggle 列 */
+  .grace-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    margin:0 0 14px;padding:12px 14px;background:var(--bg2);border-radius:10px;border:1px solid var(--line)}
+  .grace-check{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .grace-check input[type=checkbox]{width:17px;height:17px;accent-color:var(--clay);cursor:pointer;flex-shrink:0}
+  .grace-check span{font-size:14px;font-weight:700;color:var(--ink);user-select:none}
+  #cGraceYearsWrap{display:none;align-items:center;gap:8px;flex:1 1 auto}
+  #cGraceYearsWrap .field{flex:0 1 160px}
+
+  /* 試算結果區塊 */
+  .result-box{margin-top:16px;padding:18px 18px 14px;background:var(--bg2);
+    border-radius:14px;border:1px solid var(--line);display:none}
+  .result-box.show{display:block}
+  .result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+  .ri-label{font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:3px}
+  .ri-value{font-family:var(--serif);font-weight:900;font-size:26px;color:var(--clay-d);line-height:1.1}
+  .ri-unit{font-size:13px;color:var(--ink-soft);margin-left:3px}
+  .result-note{font-size:12.5px;color:var(--ink-soft);padding-top:12px;border-top:1px dashed var(--line);line-height:1.7}
+  .result-note b{color:var(--ink)}
+
+  /* 模組 C 寬限期結果小卡 */
+  .grace-result{display:none;background:#F0F6F3;border-radius:10px;padding:10px 14px;margin-bottom:14px;border:1px solid #C7E0D0}
+  .gr-label{font-size:12px;font-weight:700;color:var(--teal-d);margin-bottom:3px}
+  .gr-value{font-family:var(--serif);font-weight:900;font-size:24px;color:var(--teal-d)}
+
+  /* 總利息提示 */
+  .interest-box{display:inline-flex;align-items:center;gap:8px;background:#FBF3E0;
+    border:1px solid #EBD8AE;border-radius:10px;padding:8px 14px;margin-top:12px;font-size:13px;color:#7a6a3e}
+  .interest-box b{color:var(--clay-d)}
+
+  /* 林口產品建議 */
+  .product-suggest{margin-top:12px;font-size:13px;color:var(--teal-d);font-weight:700;min-height:20px}
+  .product-suggest .ph{color:var(--ink-soft);font-weight:400;font-style:italic}
+
+  /* 林口參考佔位卡片 */
+  .coming-soon{padding:28px 22px;text-align:center}
+  .coming-soon .icon{font-size:36px;margin-bottom:10px}
+  .coming-soon .title{font-family:var(--serif);font-weight:900;font-size:16px;color:var(--ink);margin-bottom:6px}
+  .coming-soon .sub{font-size:13px;color:var(--ink-soft);max-width:42ch;margin:0 auto}
+</style>
+</head>
+<body>
+
+<!-- 全站導覽列 -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">林口置產工具箱</a>
+    <div class="nav-links">
+      <a href="index.html">學區快查</a>
+      <a href="mortgage.html" class="active">房貸試算</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div>
+      <span class="badge">購屋財務試算</span>
+      <h1>林口<span class="mk">房貸</span>試算</h1>
+      <p>四種試算方式，從薪資、月繳、頭期款或自訂條件，快速估算購屋預算與每月負擔。</p>
+    </div>
+    <div class="yr">
+      太平洋房屋<br>林口捷運加盟店<br><span style="color:#E7D7BE">李天夏 · 温美慈</span>
+    </div>
+  </header>
+
+  <!-- ── 模組 A：薪資推算 ─────────────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>薪資推算可買房價</div>
+  <section class="panel calc-panel">
+    <div class="module-header">
+      <div class="module-title"><span class="dot"></span>根據月薪估算銀行最高可貸金額</div>
+      <div class="module-desc">依銀行負債比上限（月薪 60%），換算可核貸金額與對應可購買總房價</div>
+    </div>
+    <div class="calc-row">
+      <div class="field">
+        <label class="lbl">月薪（元）</label>
+        <input type="number" id="aMonthly" placeholder="例：50000" min="0">
+      </div>
+      <div class="field">
+        <label class="lbl">現有每月貸款月繳（元，選填）</label>
+        <input type="number" id="aExisting" placeholder="車貸、信貸等，無則留空">
+      </div>
+    </div>
+    <button class="btn" id="aBtnCalc">試算可買房價</button>
+
+    <div id="aResult" class="result-box">
+      <div class="result-grid">
+        <div>
+          <div class="ri-label">可借金額上限</div>
+          <div class="ri-value"><span id="aResultLoan">—</span><span class="ri-unit">萬</span></div>
+        </div>
+        <div>
+          <div class="ri-label">可購買總房價（8 成貸）</div>
+          <div class="ri-value"><span id="aResultPrice">—</span><span class="ri-unit">萬</span></div>
+        </div>
+        <div>
+          <div class="ri-label">每月房貸（約）</div>
+          <div class="ri-value"><span id="aResultMonthly">—</span><span class="ri-unit">元</span></div>
+        </div>
+      </div>
+      <div class="result-note">
+        月薪 × 60% = <b id="aMaxDebt">—</b> 元（銀行負債上限），
+        扣除現有月繳後可分配 <b id="aAvailable">—</b> 元於房貸。
+        以 30 年期、年利率 2.7%、每 100 萬月繳約 4,100 元計算。
+      </div>
+      <div id="aProductSuggest" class="product-suggest"></div>
+    </div>
+  </section>
+
+  <!-- ── 模組 B：月繳反推 ─────────────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>月繳金額反推可買房價</div>
+  <section class="panel calc-panel">
+    <div class="module-header">
+      <div class="module-title"><span class="dot"></span>設定每月願意負擔的金額，換算可買總房價</div>
+      <div class="module-desc">直接輸入你能接受的月繳房貸，推算對應的可貸金額與總房價</div>
+    </div>
+    <div class="calc-row">
+      <div class="field">
+        <label class="lbl">每月願意繳房貸（元）</label>
+        <input type="number" id="bMonthly" placeholder="例：30000" min="0">
+      </div>
+    </div>
+    <button class="btn" id="bBtnCalc">試算可買房價</button>
+
+    <div id="bResult" class="result-box">
+      <div class="result-grid">
+        <div>
+          <div class="ri-label">可借金額上限</div>
+          <div class="ri-value"><span id="bResultLoan">—</span><span class="ri-unit">萬</span></div>
+        </div>
+        <div>
+          <div class="ri-label">可購買總房價（8 成貸）</div>
+          <div class="ri-value"><span id="bResultPrice">—</span><span class="ri-unit">萬</span></div>
+        </div>
+      </div>
+      <div class="result-note">以 30 年期、年利率 2.7%、每 100 萬月繳約 4,100 元計算。</div>
+      <div id="bProductSuggest" class="product-suggest"></div>
+    </div>
+  </section>
+
+  <!-- ── 模組 C：自訂貸款試算 ────────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>自訂貸款試算（含寬限期）</div>
+  <section class="panel calc-panel">
+    <div class="module-header">
+      <div class="module-title"><span class="dot"></span>輸入借款條件，精算每月還款金額</div>
+      <div class="module-desc">自訂借款金額、年數、利率與寬限期，以本息平均攤還公式計算</div>
+    </div>
+    <div class="calc-row">
+      <div class="field">
+        <label class="lbl">借款金額（萬元）</label>
+        <input type="number" id="cLoanAmount" placeholder="例：800" min="0">
+      </div>
+      <div class="field">
+        <label class="lbl">貸款年數</label>
+        <select id="cYears">
+          <option value="10">10 年</option>
+          <option value="15">15 年</option>
+          <option value="20">20 年</option>
+          <option value="25">25 年</option>
+          <option value="30" selected>30 年</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">年利率（%）</label>
+        <input type="number" id="cRate" placeholder="例：2.7" value="2.7" min="0" max="20" step="0.01">
+      </div>
+    </div>
+
+    <!-- 寬限期 -->
+    <div class="grace-row">
+      <label class="grace-check">
+        <input type="checkbox" id="cHasGrace">
+        <span>有寬限期（寬限期間只繳利息，不還本金）</span>
+      </label>
+      <div id="cGraceYearsWrap">
+        <div class="field">
+          <label class="lbl">寬限年數</label>
+          <select id="cGraceYears">
+            <option value="1">1 年</option>
+            <option value="2">2 年</option>
+            <option value="3">3 年</option>
+            <option value="5">5 年</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="cBtnCalc">試算月繳金額</button>
+
+    <div id="cResult" class="result-box">
+      <!-- 寬限期月繳（有寬限期才顯示） -->
+      <div id="cGraceRow" class="grace-result">
+        <div class="gr-label">
+          寬限期間月繳（只繳利息）
+          <span id="cGraceNote" style="font-weight:400;margin-left:8px;font-size:11px"></span>
+        </div>
+        <div><span class="gr-value" id="cResultGrace">—</span><span style="font-size:13px;color:var(--teal-d);margin-left:4px">元</span></div>
+      </div>
+      <!-- 正常月繳 -->
+      <div class="result-grid">
+        <div>
+          <div class="ri-label">
+            正常月繳金額（本息攤還）
+            <span id="cNormalNote" style="font-weight:400;color:var(--ink-soft);margin-left:6px;font-size:11px"></span>
+          </div>
+          <div class="ri-value"><span id="cResultNormal">—</span><span class="ri-unit">元</span></div>
+        </div>
+      </div>
+      <div class="interest-box">
+        💡 貸款期間總利息約 <b><span id="cResultInterest">—</span> 萬元</b>
+      </div>
+      <div class="result-note" style="margin-top:12px">
+        計算方式：本息平均攤還（PMT 公式）。寬限期間本金不減少，寬限結束後以剩餘年期重新計算本息。
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 模組 D：頭期款反推 ──────────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>頭期款推算可買房價</div>
+  <section class="panel calc-panel">
+    <div class="module-header">
+      <div class="module-title"><span class="dot"></span>根據手上的頭期款，推算可購買的總房價</div>
+      <div class="module-desc">輸入頭期款金額與貸款成數，計算可負擔總房價及每月房貸</div>
+    </div>
+    <div class="calc-row">
+      <div class="field">
+        <label class="lbl">頭期款金額（萬元）</label>
+        <input type="number" id="dDownPayment" placeholder="例：300" min="0">
+      </div>
+      <div class="field">
+        <label class="lbl">貸款成數</label>
+        <select id="dLoanRatio">
+          <option value="0.7">7 成貸（自備 30%）</option>
+          <option value="0.8" selected>8 成貸（自備 20%）</option>
+          <option value="0.85">8.5 成貸（自備 15%）</option>
+          <option value="0.9">9 成貸（自備 10%）</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="dBtnCalc">試算可買房價</button>
+
+    <div id="dResult" class="result-box">
+      <div class="result-grid">
+        <div>
+          <div class="ri-label">可購買總房價</div>
+          <div class="ri-value"><span id="dResultPrice">—</span><span class="ri-unit">萬</span></div>
+        </div>
+        <div>
+          <div class="ri-label">需要貸款金額</div>
+          <div class="ri-value"><span id="dResultLoan">—</span><span class="ri-unit">萬</span></div>
+        </div>
+        <div>
+          <div class="ri-label">每月房貸（約）</div>
+          <div class="ri-value"><span id="dResultMonthly">—</span><span class="ri-unit">元</span></div>
+        </div>
+      </div>
+      <div class="result-note">月繳以 30 年期、年利率 2.7% 估算。若需精確試算，請至上方「自訂貸款試算」輸入實際條件。</div>
+      <div id="dProductSuggest" class="product-suggest"></div>
+    </div>
+  </section>
+
+  <!-- ── 林口市場參考（待補充）──────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>林口市場參考</div>
+  <div class="panel coming-soon">
+    <div class="icon">🏗️</div>
+    <div class="title">林口各價位對應房產類型即將上線</div>
+    <div class="sub">依試算結果自動對應林口可購買的房屋類型（如：1,000–1,500 萬可購買 15 年中古 2 房等），資料補充後即可顯示。</div>
+  </div>
+
+  <div class="disc">
+    ⚠️ <b>免責聲明</b>：本工具所有試算結果均為估算，僅供參考。實際核貸金額視個人信用條件、收入核實及銀行政策而定，與試算結果可能有所差異。購屋為重大財務決策，建議向銀行或專業人士確認。
+  </div>
+
+  <footer>
+    太平洋房屋・林口捷運加盟店 ｜ 李天夏 · 温美慈<br>
+    本工具試算結果僅供參考，不構成任何財務建議
+  </footer>
+
+</div><!-- /wrap -->
+
+<div class="toast" id="toast"></div>
+
+<script src="mortgage-data.js"></script>
+<script>
+  const $ = s => document.querySelector(s);
+  let _toastTimer;
+
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  }
+
+  /* 數字格式化（整數，加千分位） */
+  function fmt(n) { return Math.round(n).toLocaleString('zh-TW'); }
+
+  /* ── 模組 A：薪資推算 ─────────────────────────── */
+  function calcA() {
+    const salary   = parseFloat($('#aMonthly').value);
+    const existing = parseFloat($('#aExisting').value) || 0;
+    if (!salary || salary <= 0) { toast('請輸入月薪'); return; }
+
+    const maxDebt   = salary * 0.6;
+    const available = maxDebt - existing;
+    if (available <= 0) { toast('現有貸款已達負債比上限，無剩餘額度可用於房貸'); return; }
+
+    /* 可借金額（萬）= 可分配月繳 / 4100 × 100 */
+    const loanWan  = available / 4100 * 100;
+    const priceWan = loanWan / 0.8;
+
+    $('#aMaxDebt').textContent   = fmt(maxDebt);
+    $('#aAvailable').textContent = fmt(available);
+    $('#aResultLoan').textContent    = fmt(loanWan);
+    $('#aResultPrice').textContent   = fmt(priceWan);
+    $('#aResultMonthly').textContent = fmt(available); // 月繳 ≈ 可分配房貸額
+    $('#aResult').classList.add('show');
+    showProduct(priceWan, '#aProductSuggest');
+  }
+
+  /* ── 模組 B：月繳反推 ─────────────────────────── */
+  function calcB() {
+    const monthly = parseFloat($('#bMonthly').value);
+    if (!monthly || monthly <= 0) { toast('請輸入每月願意繳的房貸金額'); return; }
+
+    const loanWan  = monthly / 4100 * 100;
+    const priceWan = loanWan / 0.8;
+
+    $('#bResultLoan').textContent  = fmt(loanWan);
+    $('#bResultPrice').textContent = fmt(priceWan);
+    $('#bResult').classList.add('show');
+    showProduct(priceWan, '#bProductSuggest');
+  }
+
+  /* ── 模組 C：自訂貸款試算 ─────────────────────── */
+  function calcC() {
+    const loanWan   = parseFloat($('#cLoanAmount').value);
+    const years     = parseInt($('#cYears').value);
+    const rate      = parseFloat($('#cRate').value);
+    const hasGrace  = $('#cHasGrace').checked;
+    const graceYrs  = hasGrace ? parseInt($('#cGraceYears').value) : 0;
+
+    if (!loanWan || loanWan <= 0) { toast('請輸入借款金額'); return; }
+    if (!rate   || rate   <= 0)   { toast('請輸入年利率');   return; }
+    if (hasGrace && graceYrs >= years) { toast('寬限年數不能大於或等於貸款年數'); return; }
+
+    const P       = loanWan * 10000;           // 元
+    const r       = rate / 100 / 12;           // 月利率
+    const n       = years * 12;                // 總期數
+    const graceN  = graceYrs * 12;             // 寬限期數
+    const remainN = n - graceN;                // 攤還期數
+
+    /* 寬限期月繳：只繳利息 */
+    const graceMonthly = P * r;
+
+    /* 本息攤還月繳（PMT 公式，作用於剩餘期數，本金仍為 P） */
+    const factor       = Math.pow(1 + r, remainN);
+    const normalMonthly = P * r * factor / (factor - 1);
+
+    /* 總利息 */
+    const totalPaid    = hasGrace
+      ? graceMonthly * graceN + normalMonthly * remainN
+      : normalMonthly * n;
+    const totalInterest = totalPaid - P;
+
+    $('#cResultNormal').textContent   = fmt(normalMonthly);
+    $('#cResultInterest').textContent = fmt(totalInterest / 10000);
+
+    if (hasGrace && graceYrs > 0) {
+      $('#cGraceRow').style.display     = 'block';
+      $('#cResultGrace').textContent    = fmt(graceMonthly);
+      $('#cGraceNote').textContent      = `寬限 ${graceYrs} 年・${graceN} 期`;
+      $('#cNormalNote').textContent     = `剩餘 ${years - graceYrs} 年・${remainN} 期`;
+    } else {
+      $('#cGraceRow').style.display = 'none';
+      $('#cNormalNote').textContent = `${years} 年・${n} 期`;
+    }
+
+    $('#cResult').classList.add('show');
+  }
+
+  /* ── 模組 D：頭期款反推 ───────────────────────── */
+  function calcD() {
+    const downWan = parseFloat($('#dDownPayment').value);
+    const ratio   = parseFloat($('#dLoanRatio').value);
+    if (!downWan || downWan <= 0) { toast('請輸入頭期款金額'); return; }
+
+    const priceWan   = downWan / (1 - ratio);
+    const loanWan    = priceWan * ratio;
+    /* 月繳以 4100/百萬 簡算（30 年 2.7%） */
+    const monthly    = loanWan / 100 * 4100;
+
+    $('#dResultPrice').textContent   = fmt(priceWan);
+    $('#dResultLoan').textContent    = fmt(loanWan);
+    $('#dResultMonthly').textContent = fmt(monthly);
+    $('#dResult').classList.add('show');
+    showProduct(priceWan, '#dProductSuggest');
+  }
+
+  /* ── 林口房產類型對應（待補充後自動啟用） ──────── */
+  function showProduct(priceWan, selector) {
+    const el = $(selector);
+    if (!el) return;
+    if (typeof LINKOU_PRODUCTS === 'undefined' || !LINKOU_PRODUCTS.length) {
+      el.innerHTML = ''; return;
+    }
+    const match = LINKOU_PRODUCTS.find(p => priceWan >= p.min && priceWan < p.max);
+    el.innerHTML = match
+      ? `🏠 在林口約可考慮：${match.types.join('、')}`
+      : '';
+  }
+
+  /* ── 事件綁定 ─────────────────────────────────── */
+
+  /* 寬限期顯示/隱藏 */
+  $('#cHasGrace').addEventListener('change', function () {
+    $('#cGraceYearsWrap').style.display = this.checked ? 'flex' : 'none';
+  });
+
+  /* 按鈕點擊 */
+  $('#aBtnCalc').addEventListener('click', calcA);
+  $('#bBtnCalc').addEventListener('click', calcB);
+  $('#cBtnCalc').addEventListener('click', calcC);
+  $('#dBtnCalc').addEventListener('click', calcD);
+
+  /* Enter 鍵觸發 */
+  ['#aMonthly', '#aExisting'].forEach(id => {
+    const el = $(id); if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') calcA(); });
+  });
+  $('#bMonthly').addEventListener('keydown', e => { if (e.key === 'Enter') calcB(); });
+  ['#cLoanAmount', '#cRate'].forEach(id => {
+    const el = $(id); if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') calcC(); });
+  });
+  $('#dDownPayment').addEventListener('keydown', e => { if (e.key === 'Enter') calcD(); });
+</script>
+</body>
+</html>
