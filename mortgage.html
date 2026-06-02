@@ -57,14 +57,20 @@
   .interest-box b{color:var(--clay-d)}
 
   /* 林口產品建議 */
-  .product-suggest{margin-top:12px;font-size:13px;color:var(--teal-d);font-weight:700;min-height:20px}
-  .product-suggest .ph{color:var(--ink-soft);font-weight:400;font-style:italic}
+  .product-suggest{margin-top:14px;padding:12px 14px;background:#F0F6F3;border:1px solid #C7E0D0;border-radius:12px;display:none}
+  .product-suggest.show{display:block}
+  .product-suggest .ps-title{font-size:12px;font-weight:700;color:var(--teal-d);margin-bottom:4px}
+  .product-suggest .ps-body{font-size:13.5px;color:var(--ink);font-weight:700}
+  .product-suggest .ps-note{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
 
-  /* 林口參考佔位卡片 */
-  .coming-soon{padding:28px 22px;text-align:center}
-  .coming-soon .icon{font-size:36px;margin-bottom:10px}
-  .coming-soon .title{font-family:var(--serif);font-weight:900;font-size:16px;color:var(--ink);margin-bottom:6px}
-  .coming-soon .sub{font-size:13px;color:var(--ink-soft);max-width:42ch;margin:0 auto}
+  /* 市場參考表格 */
+  .mkt-table{width:100%;border-collapse:collapse;font-size:13px}
+  .mkt-table th{background:var(--bg2);color:var(--ink-soft);font-weight:700;font-size:12px;
+    padding:8px 10px;text-align:left;border-bottom:2px solid var(--line)}
+  .mkt-table td{padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink)}
+  .mkt-table tbody tr:hover{background:var(--bg2)}
+  .mkt-table td:first-child{font-weight:700;color:var(--clay-d)}
+  .mkt-table td:nth-child(2){color:var(--ink-soft);font-size:12px}
 </style>
 </head>
 <body>
@@ -288,12 +294,30 @@
     </div>
   </section>
 
-  <!-- ── 林口市場參考（待補充）──────────────────────── -->
-  <div class="sec-title"><span class="bar"></span>林口市場參考</div>
-  <div class="panel coming-soon">
-    <div class="icon">🏗️</div>
-    <div class="title">林口各價位對應房產類型即將上線</div>
-    <div class="sub">依試算結果自動對應林口可購買的房屋類型（如：1,000–1,500 萬可購買 15 年中古 2 房等），資料補充後即可顯示。</div>
+  <!-- ── 林口市場參考 ──────────────────────────────── -->
+  <div class="sec-title"><span class="bar"></span>林口市場各價位參考</div>
+  <div class="panel" style="padding:22px">
+    <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">
+      依內政部實價登錄 115 年第一季，林口區住宅成交資料統計（219 筆），供購屋預算規劃參考。
+    </div>
+    <div style="overflow-x:auto">
+      <table class="mkt-table">
+        <thead>
+          <tr><th>總價區間</th><th>成交筆數</th><th>屋齡中位</th><th>坪數中位</th><th>常見房數</th><th>主要型態</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1,000 萬以下</td><td>15 筆</td><td>36 年</td><td>22 坪</td><td>1 房</td><td>老公寓・住宅大樓</td></tr>
+          <tr><td>1,000–1,400 萬</td><td>43 筆</td><td>15 年</td><td>27 坪</td><td>2 房</td><td>華廈・住宅大樓</td></tr>
+          <tr><td>1,400–1,800 萬</td><td>53 筆</td><td>11 年</td><td>31 坪</td><td>2 房</td><td>住宅大樓為主</td></tr>
+          <tr><td>1,800–2,500 萬</td><td>57 筆</td><td>8 年</td><td>38 坪</td><td>3 房</td><td>住宅大樓為主</td></tr>
+          <tr><td>2,500–3,500 萬</td><td>28 筆</td><td>8 年</td><td>57 坪</td><td>3 房</td><td>住宅大樓・華廈</td></tr>
+          <tr><td>3,500 萬以上</td><td>23 筆</td><td>11 年</td><td>94 坪</td><td>3 房以上</td><td>住宅大樓・透天厝</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-soft);margin-top:10px">
+      ⚠️ 本統計為單季成交樣本，僅供方向性參考。實際市場行情請洽專業房仲確認。
+    </div>
   </div>
 
   <div class="disc">
@@ -427,17 +451,20 @@
     showProduct(priceWan, '#dProductSuggest');
   }
 
-  /* ── 林口房產類型對應（待補充後自動啟用） ──────── */
+  /* ── 林口房產類型對應 ──────── */
   function showProduct(priceWan, selector) {
     const el = $(selector);
     if (!el) return;
     if (typeof LINKOU_PRODUCTS === 'undefined' || !LINKOU_PRODUCTS.length) {
-      el.innerHTML = ''; return;
+      el.classList.remove('show'); return;
     }
     const match = LINKOU_PRODUCTS.find(p => priceWan >= p.min && priceWan < p.max);
-    el.innerHTML = match
-      ? `🏠 在林口約可考慮：${match.types.join('、')}`
-      : '';
+    if (!match) { el.classList.remove('show'); return; }
+    el.innerHTML =
+      `<div class="ps-title">🏠 在林口約可考慮（實價登錄參考）</div>` +
+      `<div class="ps-body">${match.label}：${match.summary}</div>` +
+      `<div class="ps-note">資料來源：內政部實價登錄 115 年 Q1，林口區住宅成交統計，僅供參考</div>`;
+    el.classList.add('show');
   }
 
   /* ── 事件綁定 ─────────────────────────────────── */
