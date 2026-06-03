@@ -55,6 +55,14 @@
   .eq-item .eq-unit{font-size:13px;color:var(--ink-soft);min-width:14px}
   .eq-note-row{margin-top:10px}
 
+  /* 現場照片縮圖牆（表單預覽用） */
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .photo-thumb{position:relative;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:#FFFDF9}
+  .photo-thumb img{width:100%;height:110px;object-fit:cover;display:block}
+  .photo-thumb .rm{position:absolute;top:5px;right:5px;width:22px;height:22px;border:none;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;font-size:15px;line-height:22px;text-align:center;cursor:pointer;padding:0}
+  .photo-thumb .rm:hover{background:rgba(0,0,0,.8)}
+
   /* 特約事項範本勾選 */
   .term-item{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);
     border-radius:10px;margin-bottom:8px;background:#FFFDF9}
@@ -98,13 +106,22 @@
   .contract-doc table.conf{width:100%;border-collapse:collapse;margin-top:8px;font-size:13.5px}
   .contract-doc table.conf td{border:1px solid #333;padding:7px 9px;vertical-align:top}
   .contract-doc table.conf td.idx{width:36px;text-align:center;font-weight:700}
+  .contract-doc table.conf td.note{width:30%;font-size:11.5px;color:#444;line-height:1.55}
+  /* 第 12 項附屬設備：雙欄無框內表 */
+  .contract-doc table.eq-inner{width:100%;border-collapse:collapse;margin-top:4px}
+  .contract-doc table.eq-inner td{border:none;padding:2px 6px;font-size:13.5px;width:50%;vertical-align:top}
   .contract-doc .pgbreak{page-break-before:always}
   .contract-doc .eq-out{column-count:2;column-gap:30px;font-size:14px}
   .contract-doc .attach-title{text-align:center;font-size:18px;font-weight:900;letter-spacing:2px;margin:6px 0 12px}
+  /* 附件二 現場照片：雙欄 */
+  .contract-doc table.photo-out{width:100%;border-collapse:collapse}
+  .contract-doc table.photo-out td{width:50%;padding:6px;vertical-align:top;border:none}
+  .contract-doc table.photo-out img{width:100%;display:block;border:1px solid #ccc}
+  .contract-doc .photo-cap{font-size:12px;text-align:center;margin-top:4px;color:#333}
 
   /* 列印：只留合約，其餘隱藏 */
   @media print{
-    .site-nav,.hero,#formArea,.action-bar,footer,.print-tip{display:none !important}
+    .site-nav,.hero,#formArea,.action-bar,footer,.print-tip,.toast{display:none !important}
     #contract{display:block !important}
     .contract-doc{box-shadow:none;border:none;border-radius:0;margin:0;max-width:none;padding:0}
     @page{size:A4;margin:1.8cm 1.6cm}
@@ -289,11 +306,15 @@
       <div class="module-title"><span class="dot"></span>費用負擔（第五條）</div>
       <div class="module-desc">各項費用由出租人或承租人負擔。</div>
       <div id="feeRows"></div>
-      <div class="row" style="margin-top:6px"><div class="field lg"><label class="lbl">公證費負擔（第六條）</label>
+      <div class="row" style="margin-top:6px">
+        <div class="field sm"><label class="lbl">公證費金額（元）</label><input type="text" id="notaryFeeAmount" placeholder="（選填）"></div>
+        <div class="field lg"><label class="lbl">公證費負擔（第六條）</label>
         <div class="opts tight">
           <label class="opt"><input type="radio" name="notaryFee" value="出租人負擔">出租人</label>
           <label class="opt"><input type="radio" name="notaryFee" value="承租人負擔">承租人</label>
           <label class="opt"><input type="radio" name="notaryFee" value="租賃雙方平均負擔" checked>雙方平均</label>
+          <label class="opt"><input type="radio" name="notaryFee" value="其他">其他</label>
+          <input type="text" id="notaryFeeOther" class="inline-mini" placeholder="其他內容">
         </div>
       </div></div>
     </section>
@@ -427,6 +448,18 @@
       </div></div>
     </section>
 
+    <!-- 8.5 現場照片（附件二） -->
+    <section class="panel form-panel">
+      <div class="module-title"><span class="dot"></span>現場照片（附件二）</div>
+      <div class="module-desc">可一次批次選取多張現場照片，將附在合約最後（附件二）。影像僅在本機處理、不會上傳。</div>
+      <label class="btn ghost" style="cursor:pointer;display:inline-block">
+        ＋ 選擇照片（可多選）
+        <input type="file" id="photoInput" accept="image/*" multiple onchange="addPhotos(event)" style="display:none">
+      </label>
+      <span class="hint" id="photoHint" style="margin-left:10px">尚未選取照片</span>
+      <div class="photo-grid" id="photoGrid"></div>
+    </section>
+
     <!-- 9. 簽約日期 -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>簽約日期</div>
@@ -498,6 +531,8 @@ function buildUI(){
       <div class="opts tight">
         <label class="opt"><input type="radio" name="fee_${f.key}" value="出租人" >由出租人負擔</label>
         <label class="opt"><input type="radio" name="fee_${f.key}" value="承租人" checked>由承租人負擔</label>
+        <label class="opt"><input type="radio" name="fee_${f.key}" value="其他">其他</label>
+        <input type="text" id="feeother_${f.key}" class="inline-mini" placeholder="其他內容">
         ${f.extra?`<span class="sub">住宅每月<input type="text" id="mgmtHome" class="inline-mini">元、車位每月<input type="text" id="mgmtPark" class="inline-mini">元</span>`:''}
       </div>
     </div></div>`).join('');
@@ -549,12 +584,22 @@ const mdate = (y,m,d) => `民國 ${fv(y,2.5)} 年 ${fv(m,2)} 月 ${fv(d,2)} 日`
 /* ---- 收集 + 組合費用條文 ---- */
 function feeLine(f){
   const who = radio('fee_'+f.key) || '承租人';
-  let s = `（${f.name==='管理費'?'一':({water:'二',power:'三',gas:'四',net:'五'})[f.key]||''}）${f.name}：${ck(who==='出租人')}由出租人負擔　${ck(who==='承租人')}由承租人負擔`;
-  if(f.key==='mgmt'){ s += `；租賃住宅每月 ${fv(val('mgmtHome'),3)} 元、停車位每月 ${fv(val('mgmtPark'),3)} 元`; }
-  if(f.key==='water') s += '（依台水帳單金額為準）';
-  if(f.key==='power') s += '（依台電帳單金額為準）';
-  if(f.key==='gas') s += '（依瓦斯公司帳單金額為準）';
-  return `<p class="ind">${s}。</p>`;
+  const num = f.name==='管理費' ? '一' : ({water:'二',power:'三',gas:'四',net:'五'})[f.key]||'';
+  // 冒號後換行，出租人 / 承租人各自一行
+  const lines = [`<p class="ind">（${num}）${f.name}：</p>`];
+  lines.push(`<p class="ind2">${ck(who==='出租人')}由出租人負擔。</p>`);
+  let lessee = `${ck(who==='承租人')}由承租人負擔`;
+  if(f.key==='water') lessee += '（依台水帳單金額為準）';
+  if(f.key==='power') lessee += '（依台電帳單金額為準）';
+  if(f.key==='gas')   lessee += '（依瓦斯公司帳單金額為準）';
+  lines.push(`<p class="ind2">${lessee}。</p>`);
+  if(f.key==='mgmt'){
+    lines.push(`<p class="ind2">租賃住宅每月 ${fv(val('mgmtHome'),3)} 元、停車位每月 ${fv(val('mgmtPark'),3)} 元。</p>`);
+  }
+  // 其他：每項費用皆提供
+  const other = who==='其他' ? fv(val('feeother_'+f.key),4) : '<span class="bl" style="min-width:4em"></span>';
+  lines.push(`<p class="ind2">${ck(who==='其他')}其他：${other}。</p>`);
+  return lines.join('');
 }
 
 /* ---- 組合特約事項 ---- */
@@ -578,14 +623,21 @@ function buildContract(){
   const owner = radio('ownerType');
   const P = [];
 
-  // 審閱權
+  // ===== 第一頁：契約審閱權，標題置於出租人下方 =====
   P.push(`<p class="ct-rev">內政部113年7月8日台內地字第11302639334號函修正</p>`);
-  P.push(`<p style="text-align:center;font-weight:700">契約審閱權</p>`);
+  // 第一頁（審閱頁）字體放大到 14pt
+  P.push(`<div style="font-size:14pt;line-height:2">`);
+  P.push(`<p style="text-align:center;font-weight:700;font-size:14pt">契約審閱權</p>`);
   P.push(`<p>本契約於中華民國 ${fv(val('revY'),2.5)} 年 ${fv(val('revM'),2)} 月 ${fv(val('revD'),2)} 日經承租人攜回審閱 ${fv(val('revDays'),1.5)} 日（契約審閱期間至少三日）。</p>`);
-  P.push(`<p>承租人：${fv(val('lesseeName'),6)}　（簽章）　　出租人：${fv(val('lessorName'),6)}　（簽章）</p>`);
+  // 承租人、出租人分兩行
+  P.push(`<p>承租人：${fv(val('lesseeName'),6)}　（簽章）</p>`);
+  P.push(`<p>出租人：${fv(val('lessorName'),6)}　（簽章）</p>`);
+  P.push(`</div>`);
+  // 住宅租賃契約書 — 置中、42pt 加粗，置於出租人下方
+  P.push(`<h1 class="ct-title" style="font-size:42pt;font-weight:900;margin:2.6cm 0 0">住宅租賃契約書</h1>`);
 
-  // 標題
-  P.push(`<h1 class="ct-title">住宅租賃契約書</h1>`);
+  // 審閱頁獨立成一頁，合約本文從次頁開始（本文不再重複大標題）
+  P.push(`<div class="pgbreak"></div>`);
   P.push(`<p>立契約書人承租人 ${fv(val('lesseeName'),6)} ，出租人 ${fv(val('lessorName'),6)} 【為 ${ck(owner==='所有權人')}所有權人 ${ck(owner==='轉租人')}轉租人（應提示經原所有權人同意轉租之證明文件）】，茲為住宅租賃事宜，雙方同意本契約條款如下：</p>`);
 
   // 第一條
@@ -630,9 +682,14 @@ function buildContract(){
 
   // 第六條
   P.push(`<p class="ct-clause">第六條　稅費負擔之約定</p>`);
+  P.push(`<p class="ind">本契約有關稅費，依下列約定辦理：</p>`);
   P.push(`<p class="ind">（一）租賃住宅之房屋稅、地價稅由出租人負擔。</p>`);
   const nf = radio('notaryFee');
-  P.push(`<p class="ind">（二）本契約租賃雙方同意辦理公證者，其公證費：${ck(nf==='出租人負擔')}由出租人負擔　${ck(nf==='承租人負擔')}由承租人負擔　${ck(nf==='租賃雙方平均負擔')}由租賃雙方平均負擔。</p>`);
+  P.push(`<p class="ind">（二）本契約租賃雙方同意辦理公證者，其公證費 ${fv(val('notaryFeeAmount'),6)} 元整。</p>`);
+  P.push(`<p class="ind2">${ck(nf==='出租人負擔')}由出租人負擔。</p>`);
+  P.push(`<p class="ind2">${ck(nf==='承租人負擔')}由承租人負擔。</p>`);
+  P.push(`<p class="ind2">${ck(nf==='租賃雙方平均負擔')}由租賃雙方平均負擔。</p>`);
+  P.push(`<p class="ind2">${ck(nf==='其他')}其他：${nf==='其他'?fv(val('notaryFeeOther'),4):'<span class="bl" style="min-width:4em"></span>'}。</p>`);
 
   // 第七~十二條（固定文字）
   [CLAUSES.c7,CLAUSES.c8].forEach(c=>pushClause(P,c));
@@ -660,14 +717,16 @@ function buildContract(){
   // 第二十條
   pushClause(P,CLAUSES.c20);
 
-  // 第二十一條
+  // 第二十一條　其他約定（公證）
+  // 表單選「同意」時，下方三項逕受強制執行事項自動帶 ■；不論勾選與否，文字皆完整呈現。
   P.push(`<p class="ct-clause">第二十一條　其他約定</p>`);
   const ag = radio('notary')==='同意';
   P.push(`<p class="ind">本契約租賃雙方 ${ck(ag)}同意 ${ck(!ag)}不同意 辦理公證。</p>`);
-  P.push(`<p class="ind">本契約經辦理公證者，租賃雙方同意公證書載明下列事項應逕受強制執行：</p>`);
-  P.push(`<p class="ind2">一、承租人如於租期屆滿後不返還租賃住宅。</p>`);
-  P.push(`<p class="ind2">二、承租人未依約給付之欠繳租金、費用及代繳之管理費，或違約時應支付之金額。</p>`);
-  P.push(`<p class="ind2">三、出租人如於租期屆滿或本契約終止時，應返還承租人之全部或一部押金。</p>`);
+  P.push(`<p class="ind">本契約經辦理公證者，租賃雙方 ${ck(!ag)}不同意 ；${ck(ag)}同意 公證書載明下列事項應逕受強制執行：</p>`);
+  P.push(`<p class="ind2">${ck(ag)}一、承租人如於租期屆滿後不返還租賃住宅。</p>`);
+  P.push(`<p class="ind2">${ck(ag)}二、承租人未依約給付之欠繳租金、費用及出租人或租賃住宅所有權人代繳之管理費，或違約時應支付之金額。</p>`);
+  P.push(`<p class="ind2">${ck(ag)}三、出租人如於租期屆滿或本契約終止時，應返還承租人之全部或一部押金。</p>`);
+  P.push(`<p class="ind">公證書載明金錢債務逕受強制執行時，如有保證人者，前項後段第 <span class="bl" style="min-width:2em"></span> 款之效力及於保證人。</p>`);
 
   // 第二十二條
   pushClause(P,CLAUSES.c22);
@@ -695,20 +754,22 @@ function buildContract(){
   // 簽署
   P.push(`<div class="sig-block">`);
   P.push(`<p style="font-weight:700">立契約書人</p>`);
-  P.push(`<p>出租人　姓名：${fv(val('lessorName'),6)}（簽章）　統一編號：${fv(val('lessorId'),6)}</p>`);
+  P.push(`<p>出租人　姓名：${fv(val('lessorName'),6)}（簽章）</p>`);
+  P.push(`<p>　　　　身分證字號：${fv(val('lessorId'),6)}</p>`);
   P.push(`<p>　　　　戶籍地址：${fv(val('lessorAddr'),14)}</p>`);
   P.push(`<p>　　　　聯絡電話：${fv(val('lessorTel'),6)}</p>`);
-  P.push(`<p>承租人　姓名：${fv(val('lesseeName'),6)}（簽章）　統一編號：${fv(val('lesseeId'),6)}</p>`);
+  P.push(`<p>承租人　姓名：${fv(val('lesseeName'),6)}（簽章）</p>`);
+  P.push(`<p>　　　　身分證字號：${fv(val('lesseeId'),6)}</p>`);
   P.push(`<p>　　　　戶籍地址：${fv(val('lesseeAddr'),14)}</p>`);
   P.push(`<p>　　　　聯絡電話：${fv(val('lesseeTel'),6)}</p>`);
   P.push(`<p style="text-align:center;margin-top:10px">${mdate(val('signY'),val('signM'),val('signD'))}</p>`);
   P.push(`</div>`);
 
-  // ===== 附件一 現況確認書 =====
+  // ===== 附件一 現況確認書（含第 12 項附屬設備）=====
   P.push(buildConfirm());
 
-  // ===== 附屬設備清單 =====
-  P.push(buildEquip());
+  // ===== 附件二 現場照片（有上傳才輸出）=====
+  if(PHOTOS.length) P.push(buildPhotos());
 
   return P.join('\n');
 }
@@ -720,46 +781,143 @@ function pushClause(P,c){
 
 function anyEq(){ return EQUIPMENT.some(e=>chk('eq_'+e.key)); }
 
-/* ---- 附件一 現況確認書（表格） ---- */
+/* ---- 附件一 現況確認書（3 欄表格：項次｜內容｜備註說明）----
+ * 內容欄：主要勾選由表單帶入；點交時才填的細項（修繕方式、月/季/年繳等）
+ *         比照紙本以靜態 □ 呈現，供現場手動勾選。
+ * 備註欄：固定法定說明，取自 rent-data.js 的 CONFIRM_NOTES。
+ * 第 12 項＝附屬設備（依使用者參考 Word，置於本表最後一格）。      */
+function nl2br(s){ return esc(s).replace(/\n/g,'<br>'); }
+
 function buildConfirm(){
-  const rows = [
-    ['1', `${ck(radio('c1')==='有')}有 ${ck(radio('c1')==='無')}無 包括未登記之改建、增建、加建、違建部分。`],
-    ['2', `建物型態：${fv($('#bldType').value,8)}。<br>建物現況格局：${fv(val('rmRoom'),2)}房 ${fv(val('rmHall'),2)}廳 ${fv(val('rmBath'),2)}衛，${ck(radio('partition')==='有')}有 ${ck(radio('partition')==='無')}無 隔間。<br>建物出租型態：${fv($('#rentType').value,8)}。`],
-    ['3', `停車位：詳如第一條約定。`],
-    ['4', `${ck(chk('fireAlarm'))}有 住宅用火災警報器；${ck(chk('fireOther'))}有 其他消防設施${chk('fireOther')?'（'+fv(val('fireOtherItem'),5)+'）':''}；${ck(chk('fireCheck'))}有 定期辦理消防安全檢查。`],
-    ['5', `${ck(radio('leak')==='有')}有 ${ck(radio('leak')==='無')}無 滲漏水之情形${radio('leak')==='有'?'，處所：'+fv(val('leakWhere'),5):''}。`],
-    ['6', `${ck(radio('radiation')==='有')}有 ${ck(radio('radiation')==='無')}無 曾經做過輻射屋檢測。`],
-    ['7', `${ck(radio('chloride')==='有')}有 ${ck(radio('chloride')==='無')}無 曾經做過水溶性氯離子含量檢測（海砂屋檢測）。`],
-    ['8', `本租賃住宅（專有部分）於產權持有期間 ${ck(radio('death')==='有')}有 ${ck(radio('death')==='無')}無 曾發生兇殺、自殺、一氧化碳中毒或其他非自然死亡之情事。`],
-    ['9', `供水及排水 ${ck(radio('water')==='正常')}正常 ${ck(radio('water')==='不正常')}不正常。`],
-    ['10', `${ck(radio('rule')==='有')}有 ${ck(radio('rule')==='無')}無 公寓大廈規約或其他住戶應遵行事項。`],
-    ['11', `${ck(radio('mgmt')==='有')}有 ${ck(radio('mgmt')==='無')}無 管理委員會統一管理；管理費：${fv(val('mgmtFee'),6)}。`],
-  ];
+  const hasPark = radio('hasPark')==='有';
+  // 各項次「內容」欄
+  const c = [];
+  c[1] = `${ck(radio('c1')==='有')}有 ${ck(radio('c1')==='無')}無 包括未登記之改建、增建、加建、違建部分：<br>`
+       + `□壹樓 ___ 平方公尺 □ ___ 樓 ___ 平方公尺。<br>□頂樓 ___ 平方公尺。<br>□其他處所： ___ 平方公尺。`;
+  c[2] = `建物型態：${fv($('#bldType').value,8)}。<br>`
+       + `建物現況格局：${fv(val('rmRoom'),2)} 房（間、室） ${fv(val('rmHall'),2)} 廳 ${fv(val('rmBath'),2)} 衛 ${ck(radio('partition')==='有')}有 ${ck(radio('partition')==='無')}無 隔間。<br>`
+       + `建物出租型態：${fv($('#rentType').value,8)}。`;
+  c[3] = `本租賃住宅 ${ck(hasPark)}有 ${ck(!hasPark)}無 停車位。`;
+  if(hasPark){
+    c[3] += `<br>汽車停車位種類及編號：<br>`
+         + `地上（下）第 ${fv(val('carFloor'),2)} 層 ${ck(radio('carType')==='平面式')}平面式停車位 ${ck(radio('carType')==='機械式')}機械式停車位 □其他 ___。<br>`
+         + `編號：第 ${fv(val('carSpotNo'),3)} 號停車位 ${fv(val('carCnt'),2)} 個，□有 □無 獨立權狀。<br>`
+         + `□有 □無 檢附分管協議及圖說。<br>`
+         + `機車停車位：地上下第 ___ 層，編號第 ___ 號車位 ${fv(val('motoCnt'),2)} 個或其位置示意圖。`;
+  }
+  c[4] = `${ck(chk('fireAlarm'))}有 □無 住宅用火災警報器。<br>`
+       + `${ck(chk('fireOther'))}有 □無 其他消防設施，若有，項目：${chk('fireOther')?fv(val('fireOtherItem'),6):'___'}。<br>`
+       + `${ck(chk('fireCheck'))}有 □無 定期辦理消防安全檢查。`;
+  c[5] = `${ck(radio('leak')==='有')}有 ${ck(radio('leak')==='無')}無 滲漏水之情形，若有，滲漏水處：${radio('leak')==='有'?fv(val('leakWhere'),5):'___'}。<br>`
+       + `滲漏水處之處理：<br>□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ______。`;
+  c[6] = `${ck(radio('radiation')==='有')}有 ${ck(radio('radiation')==='無')}無 曾經做過輻射屋檢測？若有，請檢附檢測證明文件。<br>`
+       + `檢測結果 □有 □無 輻射異常，若有異常之處理：<br>□由出租人改善後交屋。<br>□由承租人改善。<br>□以現況交屋。<br>□其他 ____。`;
+  c[7] = `${ck(radio('chloride')==='有')}有 ${ck(radio('chloride')==='無')}無 曾經做過鋼筋混凝土中水溶性氯離子含量檢測（例如海砂屋檢測事項）；若有，檢測結果：______。<br>`
+       + `□有 □無 超過容許值含量，若有超過之處理：<br>□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ____。`;
+  c[8] = `本租賃住宅（專有部分）是否曾發生兇殺、自殺、一氧化碳中毒或其他非自然死亡之情事：<br>`
+       + `(1)於產權持有期間 ${ck(radio('death')==='有')}有 ${ck(radio('death')==='無')}無 曾發生上列情事。<br>`
+       + `(2)於產權持有前<br>□無上列情事。<br>□知道曾發生上列情事。<br>□不知道曾否發生上列情事。`;
+  c[9] = `供水及排水 ${ck(radio('water')==='正常')}是 ${ck(radio('water')==='不正常')}否 正常，若不正常，<br>`
+       + `□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ____。`;
+  c[10] = `${ck(radio('rule')==='有')}有 ${ck(radio('rule')==='無')}無 公寓大廈規約或其他住戶應遵行事項；若有，□有 □無 檢附規約或其他住戶應遵行事項。`;
+  const fee = val('mgmtFee');
+  c[11] = `${ck(radio('mgmt')==='有')}有 ${ck(radio('mgmt')==='無')}無 管理委員會統一管理，<br>`
+       + `若有<br>`
+       + `租賃住宅管理費為<br>`
+       + `□月繳新臺幣 ___ 元<br>`
+       + `□季繳新臺幣 ___ 元<br>`
+       + `□年繳新臺幣 ___ 元<br>`
+       + `${fee?'■其他 '+fv(fee,6):'□其他 ______'}。<br><br>`
+       + `停車位管理費為<br>`
+       + `□月繳新臺幣 ___ 元<br>`
+       + `□季繳新臺幣 ___ 元<br>`
+       + `□年繳新臺幣 ___ 元<br>`
+       + `□其他 ______。<br><br>`
+       + `□有 □無 積欠租賃住宅、停車位管理費；若有，新臺幣 ____ 元。`;
+
   let h = `<div class="pgbreak"></div>`;
   h += `<p class="attach-title">附件一　租賃標的現況確認書</p>`;
   h += `<p style="text-align:right;font-size:13px">填表日期：${mdate(val('signY'),val('signM'),val('signD'))}</p>`;
-  h += `<table class="conf"><tr><td class="idx">項次</td><td>內容</td></tr>`;
-  rows.forEach(r=> h += `<tr><td class="idx">${r[0]}</td><td>${r[1]}</td></tr>`);
+  h += `<table class="conf"><tr><td class="idx">項次</td><td>內容</td><td class="note">備註說明</td></tr>`;
+  for(let i=1;i<=11;i++){
+    const note = CONFIRM_NOTES[i] || '';
+    h += `<tr><td class="idx">${i}</td><td>${c[i]}</td><td class="note">${nl2br(note)}</td></tr>`;
+  }
+  // 第 12 項：附屬設備（置於表格最後一格）
+  h += `<tr><td class="idx">12</td><td>${eqCellHTML()}</td><td class="note"></td></tr>`;
   h += `</table>`;
   h += `<div class="sig-block"><p>出租人：${fv(val('lessorName'),6)}（簽章）　承租人：${fv(val('lesseeName'),6)}（簽章）</p>`;
   h += `<p>簽章日期：${mdate(val('signY'),val('signM'),val('signD'))}</p></div>`;
   return h;
 }
 
-/* ---- 附屬設備清單 ---- */
-function buildEquip(){
-  let h = `<div class="pgbreak"></div><p class="attach-title">附屬設備清單</p>`;
-  h += `<p>附屬設備項目如下：</p><div class="eq-out">`;
-  EQUIPMENT.forEach(e=>{
+/* ---- 第 12 項：附屬設備清單（雙欄無框內表，PDF/Word 皆能並排）---- */
+function eqCellHTML(){
+  let h = `附屬設備項目如下：`;
+  h += `<table class="eq-inner"><tr>`;
+  EQUIPMENT.forEach((e,i)=>{
     const on = chk('eq_'+e.key);
-    const q = e.unit ? ` ${val('eqq_'+e.key)||''} ${e.unit}` : '';
-    h += `<p>${ck(on)}${e.name}${on?q:''}</p>`;
+    const q = (on && e.unit) ? ` ${val('eqq_'+e.key)||''} ${e.unit}` : '';
+    h += `<td>${ck(on)}${e.name}${q}</td>`;
+    if(i%2===1) h += `</tr><tr>`;   // 每兩格換列
   });
-  h += `</div>`;
+  h += `</tr></table>`;
   const note = val('eqNote');
-  if(note) h += `<p style="margin-top:8px">備註：${esc(note)}</p>`;
-  h += `<div class="sig-block"><p>出租人：${fv(val('lessorName'),6)}（簽章）　承租人：${fv(val('lesseeName'),6)}（簽章）</p>`;
-  h += `<p>簽章日期：${mdate(val('signY'),val('signM'),val('signD'))}</p></div>`;
+  if(note) h += `<div style="margin-top:6px">備註：${esc(note)}</div>`;
+  return h;
+}
+
+/* ---- 現場照片（附件二）----
+ * 純前端：上傳後在本機以 canvas 縮圖、轉 JPEG（控制檔案大小、利於 Word 內嵌），
+ * 以 base64 data URI 存於記憶體陣列，不上傳任何伺服器。
+ * caption 欄位先保留（目前不填），日後要在每張下加簡短說明可直接沿用。     */
+let PHOTOS = [];   // {data: dataURL, caption: ''}
+
+function addPhotos(ev){
+  const files = [...ev.target.files];
+  ev.target.value = '';   // 清空，允許之後再選同一檔
+  files.forEach(file=>{
+    if(!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        // 縮至最長邊 1000px
+        const max = 1000;
+        let w = img.width, h = img.height;
+        if(w>max || h>max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        PHOTOS.push({ data: cv.toDataURL('image/jpeg', 0.82), caption: '' });
+        renderPhotos();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotos(){
+  $('#photoGrid').innerHTML = PHOTOS.map((p,i)=>`
+    <div class="photo-thumb">
+      <button class="rm" onclick="removePhoto(${i})" title="移除">×</button>
+      <img src="${p.data}" alt="現場照片 ${i+1}">
+    </div>`).join('');
+  $('#photoHint').textContent = PHOTOS.length ? `已選取 ${PHOTOS.length} 張照片` : '尚未選取照片';
+}
+
+function removePhoto(i){ PHOTOS.splice(i,1); renderPhotos(); }
+
+/* ---- 附件二 現場照片（輸出，雙欄網格；caption 有值才顯示）---- */
+function buildPhotos(){
+  let h = `<div class="pgbreak"></div><p class="attach-title">附件二　現場照片</p>`;
+  h += `<table class="photo-out"><tr>`;
+  PHOTOS.forEach((p,i)=>{
+    h += `<td><img src="${p.data}">${p.caption?`<div class="photo-cap">${esc(p.caption)}</div>`:''}</td>`;
+    if(i%2===1) h += `</tr><tr>`;   // 每兩張換列
+  });
+  h += `</tr></table>`;
   return h;
 }
 
@@ -791,13 +949,23 @@ function exportWord(){
     .fv{font-weight:700;text-decoration:underline}
     .attach-title{text-align:center;font-size:15pt;font-weight:700;letter-spacing:2px;margin:10pt 0}
     table.conf{width:100%;border-collapse:collapse;font-size:11pt}
-    table.conf td{border:1px solid #333;padding:5pt}.idx{width:36px;text-align:center;font-weight:700}
+    table.conf td{border:1px solid #333;padding:5pt;vertical-align:top}.idx{width:36px;text-align:center;font-weight:700}
+    table.conf td.note{width:30%;font-size:9.5pt;color:#333}
+    table.eq-inner{width:100%;border-collapse:collapse}
+    table.eq-inner td{border:none;padding:2pt 5pt;font-size:10.5pt;width:50%}
+    table.photo-out{width:100%;border-collapse:collapse}
+    table.photo-out td{width:50%;padding:6pt;vertical-align:top}
+    table.photo-out img{width:100%;border:1px solid #ccc}
+    .photo-cap{font-size:10pt;text-align:center}
     .pgbreak{page-break-before:always}.eq-out{font-size:11pt}.sig-block{line-height:2}`;
+  // Word 不認空 div 的 page-break-before；改用 MS Office 專用換頁符，分頁才會生效
+  const wordBreak = "<br clear=all style='mso-special-character:line-break;page-break-before:always'>";
+  const inner = $('#contractDoc').innerHTML.replace(/<div class="pgbreak"><\/div>/g, wordBreak);
   const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head><meta charset='utf-8'><title>住宅租賃契約書</title>
     <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
-    <style>@page{size:A4;margin:2cm 1.8cm}${css}</style></head>
-    <body>${$('#contractDoc').innerHTML}</body></html>`;
+    <style>@page{size:A4;margin:2.54cm 3.17cm}${css}</style></head>
+    <body>${inner}</body></html>`;
   const blob = new Blob(['﻿'+html], {type:'application/msword'});
   const name = (val('lesseeName')||'租約') + '_住宅租賃契約書.doc';
   const a = document.createElement('a');
