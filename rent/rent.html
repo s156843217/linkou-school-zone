@@ -119,6 +119,26 @@
   .contract-doc table.photo-out img{width:100%;display:block;border:1px solid #ccc}
   .contract-doc .photo-cap{font-size:12px;text-align:center;margin-top:4px;color:#333}
 
+  /* ====== 手機版合約預覽優化（僅縮放螢幕預覽，不影響列印 / 桌機） ====== */
+  @media (max-width:600px){
+    /* 合約紙張：縮小左右留白與字級，避免在手機上需要左右捲動 */
+    .contract-doc{margin:14px 0;padding:24px 18px;font-size:13.5px;line-height:1.7;border-radius:6px}
+    /* 第一頁大標題（內嵌 42pt）縮到不溢出畫面 */
+    .contract-doc h1.ct-title{font-size:30px !important;letter-spacing:2px;margin-top:1.6cm !important}
+    .contract-doc .ct-clause{font-size:14.5px}
+    /* 條文縮排在窄螢幕收斂一點，留更多文字寬度 */
+    .contract-doc .ind{padding-left:1.1em}
+    .contract-doc .ind2{padding-left:2em}
+    /* 附屬設備雙欄、現場照片雙欄 → 改單欄，手機才看得清楚 */
+    .contract-doc .eq-out{column-count:1}
+    .contract-doc table.photo-out td{display:block;width:100%}
+    /* 現況確認書表格：縮小字級與內距，整列才放得下 */
+    .contract-doc table.conf{font-size:12px}
+    .contract-doc table.conf td{padding:5px 6px}
+    .contract-doc table.conf td.idx{width:26px}
+    .contract-doc table.conf td.note{font-size:10.5px}
+  }
+
   /* 列印：只留合約，其餘隱藏 */
   @media print{
     .site-nav,.hero,#formArea,.action-bar,footer,.print-tip,.toast{display:none !important}
