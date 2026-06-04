@@ -53,6 +53,11 @@
   .eq-item .eq-name{font-size:14px;font-weight:700;color:var(--ink);flex:1;cursor:pointer}
   .eq-item .eq-qty{width:52px;padding:6px 8px;text-align:center;font-size:14px}
   .eq-item .eq-unit{font-size:13px;color:var(--ink-soft);min-width:14px}
+  /* 自訂設備列：可編輯名稱 / 單位 + 移除鈕 */
+  .eq-item .eq-name-input{flex:1;min-width:0;padding:6px 8px;font-size:14px}
+  .eq-item .eq-unit-input{width:42px;padding:6px 4px;text-align:center;font-size:13px}
+  .eq-item .eq-rm{border:none;background:none;color:var(--ink-soft);font-size:18px;line-height:1;cursor:pointer;padding:0 2px;flex-shrink:0}
+  .eq-item .eq-rm:hover{color:var(--clay)}
   .eq-note-row{margin-top:10px}
 
   /* 現場照片縮圖牆（表單預覽用） */
@@ -82,6 +87,11 @@
   .conf-q{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:8px}
   .conf-q .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
     background:var(--clay);color:#fff;border-radius:6px;font-size:12px;margin-right:8px}
+  /* 選「有／不正常」才展開的後續處理選項 */
+  .conf-sub{display:none;margin-top:10px;padding-left:12px;border-left:3px solid var(--clay)}
+  .conf-sub.show{display:block}
+  .conf-sub .sub-label{display:block;font-size:12.5px;font-weight:700;color:var(--clay-d);margin:2px 0 6px}
+  .conf-sub .opts{margin-bottom:4px}
 
   /* 操作列（黏在底部，方便隨時產生） */
   .action-bar{position:sticky;bottom:0;z-index:50;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
@@ -98,8 +108,9 @@
   .contract-doc .ct-rev{text-align:right;font-size:12px;color:#555;margin-bottom:4px}
   .contract-doc .ct-clause{font-weight:700;font-size:16px;margin:16px 0 6px}
   .contract-doc p{margin:3px 0;text-align:justify}
-  .contract-doc .ind{padding-left:1.6em}
-  .contract-doc .ind2{padding-left:3em}
+  /* 條文縮排改用 margin-left（而非 padding-left），讓「懸掛縮排」可用 inline 樣式覆寫 */
+  .contract-doc .ind{margin-left:1.6em}
+  .contract-doc .ind2{margin-left:3em}
   .contract-doc .fv{font-weight:700;color:#000;border-bottom:1px solid #000;padding:0 4px}
   .contract-doc .bl{display:inline-block;border-bottom:1px solid #000;min-width:3em;height:1.1em;vertical-align:bottom}
   .contract-doc .sig-block{margin-top:14px;line-height:2.2}
@@ -127,8 +138,8 @@
     .contract-doc h1.ct-title{font-size:30px !important;letter-spacing:2px;margin-top:1.6cm !important}
     .contract-doc .ct-clause{font-size:14.5px}
     /* 條文縮排在窄螢幕收斂一點，留更多文字寬度 */
-    .contract-doc .ind{padding-left:1.1em}
-    .contract-doc .ind2{padding-left:2em}
+    .contract-doc .ind{margin-left:1.1em}
+    .contract-doc .ind2{margin-left:2em}
     /* 附屬設備雙欄、現場照片雙欄 → 改單欄，手機才看得清楚 */
     .contract-doc .eq-out{column-count:1}
     .contract-doc table.photo-out td{display:block;width:100%}
@@ -425,27 +436,92 @@
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">5</span>滲漏水情形</div>
-        <div class="opts tight"><label class="opt"><input type="radio" name="leak" value="無" checked>無</label><label class="opt"><input type="radio" name="leak" value="有">有</label><input type="text" id="leakWhere" class="inline-mini" placeholder="處所"></div>
+        <div class="opts tight"><label class="opt"><input type="radio" name="leak" value="無" checked onchange="toggleConf()">無</label><label class="opt"><input type="radio" name="leak" value="有" onchange="toggleConf()">有</label><input type="text" id="leakWhere" class="inline-mini" placeholder="滲漏水處所"></div>
+        <div class="conf-sub" id="leakSub">
+          <span class="sub-label">滲漏水處之處理：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="leakFix" value="出租人修繕後交屋">由出租人修繕後交屋</label>
+            <label class="opt"><input type="radio" name="leakFix" value="承租人修繕">由承租人修繕</label>
+            <label class="opt"><input type="radio" name="leakFix" value="現況交屋">以現況交屋</label>
+            <label class="opt"><input type="radio" name="leakFix" value="其他">其他</label>
+            <input type="text" id="leakFixOther" class="inline-mini" placeholder="其他處理">
+          </div>
+        </div>
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">6</span>輻射屋檢測</div>
-        <div class="opts tight"><label class="opt"><input type="radio" name="radiation" value="無" checked>無</label><label class="opt"><input type="radio" name="radiation" value="有">有</label></div>
+        <div class="opts tight"><label class="opt"><input type="radio" name="radiation" value="無" checked onchange="toggleConf()">無（未檢測）</label><label class="opt"><input type="radio" name="radiation" value="有" onchange="toggleConf()">有（曾檢測）</label></div>
+        <div class="conf-sub" id="radSub">
+          <span class="sub-label">檢測結果（請檢附檢測證明文件）：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="radResult" value="無">無輻射異常</label>
+            <label class="opt"><input type="radio" name="radResult" value="有">有輻射異常</label>
+          </div>
+          <span class="sub-label" style="margin-top:8px">若有異常之處理：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="radFix" value="出租人改善後交屋">由出租人改善後交屋</label>
+            <label class="opt"><input type="radio" name="radFix" value="承租人改善">由承租人改善</label>
+            <label class="opt"><input type="radio" name="radFix" value="現況交屋">以現況交屋</label>
+            <label class="opt"><input type="radio" name="radFix" value="其他">其他</label>
+            <input type="text" id="radFixOther" class="inline-mini" placeholder="其他處理">
+          </div>
+        </div>
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">7</span>水溶性氯離子（海砂屋）檢測</div>
-        <div class="opts tight"><label class="opt"><input type="radio" name="chloride" value="無" checked>無</label><label class="opt"><input type="radio" name="chloride" value="有">有</label></div>
+        <div class="opts tight"><label class="opt"><input type="radio" name="chloride" value="無" checked onchange="toggleConf()">無（未檢測）</label><label class="opt"><input type="radio" name="chloride" value="有" onchange="toggleConf()">有（曾檢測）</label></div>
+        <div class="conf-sub" id="chlSub">
+          <div class="sub"><span class="sub-label" style="display:inline;margin:0">檢測結果：</span><input type="text" id="chlResultText" class="inline-mini" placeholder="如 0.15 ㎏/m³" style="flex:0 1 160px"></div>
+          <span class="sub-label" style="margin-top:8px">是否超過容許值：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="chlOver" value="無">無超過</label>
+            <label class="opt"><input type="radio" name="chlOver" value="有">有超過</label>
+          </div>
+          <span class="sub-label" style="margin-top:8px">若有超過之處理：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="chlFix" value="出租人修繕後交屋">由出租人修繕後交屋</label>
+            <label class="opt"><input type="radio" name="chlFix" value="承租人修繕">由承租人修繕</label>
+            <label class="opt"><input type="radio" name="chlFix" value="現況交屋">以現況交屋</label>
+            <label class="opt"><input type="radio" name="chlFix" value="其他">其他</label>
+            <input type="text" id="chlFixOther" class="inline-mini" placeholder="其他處理">
+          </div>
+        </div>
       </div>
       <div class="conf-item">
-        <div class="conf-q"><span class="num">8</span>是否曾發生兇殺／自殺／一氧化碳中毒等非自然死亡（產權持有期間）</div>
+        <div class="conf-q"><span class="num">8</span>是否曾發生兇殺／自殺／一氧化碳中毒等非自然死亡</div>
+        <div class="sub" style="margin-bottom:6px">(1) 產權持有期間</div>
         <div class="opts tight"><label class="opt"><input type="radio" name="death" value="無" checked>無</label><label class="opt"><input type="radio" name="death" value="有">有</label></div>
+        <div class="sub" style="margin:10px 0 6px">(2) 產權持有前</div>
+        <div class="opts tight">
+          <label class="opt"><input type="radio" name="deathBefore" value="無" checked>無上列情事</label>
+          <label class="opt"><input type="radio" name="deathBefore" value="知道">知道曾發生</label>
+          <label class="opt"><input type="radio" name="deathBefore" value="不知道">不知道曾否發生</label>
+        </div>
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">9</span>供水及排水</div>
-        <div class="opts tight"><label class="opt"><input type="radio" name="water" value="正常" checked>正常</label><label class="opt"><input type="radio" name="water" value="不正常">不正常</label></div>
+        <div class="opts tight"><label class="opt"><input type="radio" name="water" value="正常" checked onchange="toggleConf()">正常</label><label class="opt"><input type="radio" name="water" value="不正常" onchange="toggleConf()">不正常</label></div>
+        <div class="conf-sub" id="waterSub">
+          <span class="sub-label">若不正常之處理：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="waterFix" value="出租人修繕後交屋">由出租人修繕後交屋</label>
+            <label class="opt"><input type="radio" name="waterFix" value="承租人修繕">由承租人修繕</label>
+            <label class="opt"><input type="radio" name="waterFix" value="現況交屋">以現況交屋</label>
+            <label class="opt"><input type="radio" name="waterFix" value="其他">其他</label>
+            <input type="text" id="waterFixOther" class="inline-mini" placeholder="其他處理">
+          </div>
+        </div>
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">10</span>公寓大廈規約或住戶應遵行事項</div>
-        <div class="opts tight"><label class="opt"><input type="radio" name="rule" value="有" checked>有</label><label class="opt"><input type="radio" name="rule" value="無">無</label></div>
+        <div class="opts tight"><label class="opt"><input type="radio" name="rule" value="有" checked onchange="toggleConf()">有</label><label class="opt"><input type="radio" name="rule" value="無" onchange="toggleConf()">無</label></div>
+        <div class="conf-sub" id="ruleSub">
+          <span class="sub-label">是否檢附規約／住戶應遵行事項：</span>
+          <div class="opts tight">
+            <label class="opt"><input type="radio" name="ruleAttach" value="有">有檢附</label>
+            <label class="opt"><input type="radio" name="ruleAttach" value="無">無檢附</label>
+          </div>
+        </div>
       </div>
       <div class="conf-item">
         <div class="conf-q"><span class="num">11</span>管理委員會與管理費</div>
@@ -460,9 +536,11 @@
     <!-- 8. 附屬設備清單 -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>附屬設備清單</div>
-      <div class="module-desc">勾選有提供的設備並填數量。</div>
+      <div class="module-desc">勾選有提供的設備並填數量；未勾選者不會輸出於合約。清單沒有的設備，可用下方按鈕自行新增。</div>
       <div class="eq-grid" id="eqGrid"></div>
-      <div class="row eq-note-row"><div class="field lg">
+      <div class="eq-grid" id="customEqGrid" style="margin-top:10px"></div>
+      <button class="btn ghost" type="button" style="margin-top:12px" onclick="addCustomEq()">＋ 新增其他設備</button>
+      <div class="row eq-note-row" style="margin-top:14px"><div class="field lg">
         <label class="lbl">設備備註（選填，例：窗簾客廳為落地式、冷氣分離式1對1）</label>
         <textarea id="eqNote" placeholder=""></textarea>
       </div></div>
@@ -597,6 +675,38 @@ function togglePark(){
 function togglePay(){
   $('#payBank').style.display = radio('payWay')==='轉帳'?'flex':'none';
 }
+/* 現況確認書第 5～10 項：選「有／不正常」時，展開後續處理選項供勾選 */
+function toggleConf(){
+  $('#leakSub') .classList.toggle('show', radio('leak')==='有');
+  $('#radSub')  .classList.toggle('show', radio('radiation')==='有');
+  $('#chlSub')  .classList.toggle('show', radio('chloride')==='有');
+  $('#waterSub').classList.toggle('show', radio('water')==='不正常');
+  $('#ruleSub') .classList.toggle('show', radio('rule')==='有');
+}
+
+/* ---- 自訂設備（清單沒有的，使用者自行新增）----
+ * customEq 只存 key；名稱/數量/單位的值直接讀 DOM，故新增/移除不會清掉已輸入內容。 */
+let customEq = [];
+let customEqSeq = 0;
+function addCustomEq(){
+  const key = 'custom_' + (++customEqSeq);
+  customEq.push(key);
+  const div = document.createElement('div');
+  div.className = 'eq-item on';
+  div.id = 'eqrow_' + key;
+  div.innerHTML =
+    `<input type="checkbox" id="eq_${key}" checked onchange="syncEq('${key}')">` +
+    `<input type="text" class="eq-name-input" id="eqname_${key}" placeholder="設備名稱">` +
+    `<input type="text" class="eq-qty" id="eqq_${key}" value="1">` +
+    `<input type="text" class="eq-unit-input" id="equnit_${key}" value="個">` +
+    `<button class="eq-rm" type="button" onclick="removeCustomEq('${key}')" title="移除">×</button>`;
+  $('#customEqGrid').appendChild(div);
+  $('#eqname_' + key).focus();
+}
+function removeCustomEq(key){
+  customEq = customEq.filter(k => k !== key);
+  document.getElementById('eqrow_' + key)?.remove();
+}
 
 /* ---- 民國日期組字 ---- */
 const mdate = (y,m,d) => `民國 ${fv(y,2.5)} 年 ${fv(m,2)} 月 ${fv(d,2)} 日`;
@@ -645,13 +755,14 @@ function buildContract(){
 
   // ===== 第一頁：契約審閱權，標題置於出租人下方 =====
   P.push(`<p class="ct-rev">內政部113年7月8日台內地字第11302639334號函修正</p>`);
-  // 第一頁（審閱頁）字體放大到 14pt
-  P.push(`<div style="font-size:14pt;line-height:2">`);
-  P.push(`<p style="text-align:center;font-weight:700;font-size:14pt">契約審閱權</p>`);
-  P.push(`<p>本契約於中華民國 ${fv(val('revY'),2.5)} 年 ${fv(val('revM'),2)} 月 ${fv(val('revD'),2)} 日經承租人攜回審閱 ${fv(val('revDays'),1.5)} 日（契約審閱期間至少三日）。</p>`);
+  // 契約審閱權：靠左對齊、置於方框內，放在「住宅租賃契約書」標題上方（比照內政部範本）
+  // 用 inline border 確保列印 PDF 與匯出 Word 皆能呈現方框
+  P.push(`<div style="border:1.5px solid #000;padding:12px 16px;font-size:14pt;line-height:2;text-align:left;margin-bottom:14px">`);
+  P.push(`<p style="text-align:left;font-weight:700;font-size:14pt;margin:0 0 4px">契約審閱權</p>`);
+  P.push(`<p style="text-align:left">本契約於中華民國 ${fv(val('revY'),2.5)} 年 ${fv(val('revM'),2)} 月 ${fv(val('revD'),2)} 日經承租人攜回審閱 ${fv(val('revDays'),1.5)} 日（契約審閱期間至少三日）。</p>`);
   // 承租人、出租人分兩行
-  P.push(`<p>承租人：${fv(val('lesseeName'),6)}　（簽章）</p>`);
-  P.push(`<p>出租人：${fv(val('lessorName'),6)}　（簽章）</p>`);
+  P.push(`<p style="text-align:left">承租人：${fv(val('lesseeName'),6)}　（簽章）</p>`);
+  P.push(`<p style="text-align:left">出租人：${fv(val('lessorName'),6)}　（簽章）</p>`);
   P.push(`</div>`);
   // 住宅租賃契約書 — 置中、42pt 加粗，置於出租人下方
   P.push(`<h1 class="ct-title" style="font-size:42pt;font-weight:900;margin:2.6cm 0 0">住宅租賃契約書</h1>`);
@@ -799,7 +910,26 @@ function pushClause(P,c){
   c.body.forEach(b=> P.push(`<p class="ind">${esc(b)}</p>`));
 }
 
-function anyEq(){ return EQUIPMENT.some(e=>chk('eq_'+e.key)); }
+function anyEq(){ return collectEquipment().length > 0; }
+
+/* 收集「有勾選」的設備（內建 + 自訂），自訂須有填名稱才算 */
+function collectEquipment(){
+  const list = [];
+  EQUIPMENT.forEach(e=>{
+    if(!chk('eq_'+e.key)) return;
+    const q = e.unit ? `${val('eqq_'+e.key)||''} ${e.unit}`.trim() : '';
+    list.push({ name: e.name, q });
+  });
+  customEq.forEach(key=>{
+    if(!chk('eq_'+key)) return;
+    const nm = val('eqname_'+key);
+    if(!nm) return;
+    const unit = val('equnit_'+key);
+    const q = unit ? `${val('eqq_'+key)||''} ${unit}`.trim() : '';
+    list.push({ name: nm, q });
+  });
+  return list;
+}
 
 /* ---- 附件一 現況確認書（3 欄表格：項次｜內容｜備註說明）----
  * 內容欄：主要勾選由表單帶入；點交時才填的細項（修繕方式、月/季/年繳等）
@@ -828,18 +958,43 @@ function buildConfirm(){
   c[4] = `${ck(chk('fireAlarm'))}有 □無 住宅用火災警報器。<br>`
        + `${ck(chk('fireOther'))}有 □無 其他消防設施，若有，項目：${chk('fireOther')?fv(val('fireOtherItem'),6):'___'}。<br>`
        + `${ck(chk('fireCheck'))}有 □無 定期辦理消防安全檢查。`;
+  // 第 5～10 項：後續「處理方式」依表單勾選帶入 ■（未選則維持 □）
+  const lf = radio('leakFix');
   c[5] = `${ck(radio('leak')==='有')}有 ${ck(radio('leak')==='無')}無 滲漏水之情形，若有，滲漏水處：${radio('leak')==='有'?fv(val('leakWhere'),5):'___'}。<br>`
-       + `滲漏水處之處理：<br>□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ______。`;
+       + `滲漏水處之處理：<br>`
+       + `${ck(lf==='出租人修繕後交屋')}由出租人修繕後交屋。<br>`
+       + `${ck(lf==='承租人修繕')}由承租人修繕。<br>`
+       + `${ck(lf==='現況交屋')}以現況交屋。<br>`
+       + `${ck(lf==='其他')}其他 ${lf==='其他'?fv(val('leakFixOther'),5):'______'}。`;
+  const rr = radio('radResult'), rf = radio('radFix');
   c[6] = `${ck(radio('radiation')==='有')}有 ${ck(radio('radiation')==='無')}無 曾經做過輻射屋檢測？若有，請檢附檢測證明文件。<br>`
-       + `檢測結果 □有 □無 輻射異常，若有異常之處理：<br>□由出租人改善後交屋。<br>□由承租人改善。<br>□以現況交屋。<br>□其他 ____。`;
-  c[7] = `${ck(radio('chloride')==='有')}有 ${ck(radio('chloride')==='無')}無 曾經做過鋼筋混凝土中水溶性氯離子含量檢測（例如海砂屋檢測事項）；若有，檢測結果：______。<br>`
-       + `□有 □無 超過容許值含量，若有超過之處理：<br>□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ____。`;
+       + `檢測結果 ${ck(rr==='有')}有 ${ck(rr==='無')}無 輻射異常，若有異常之處理：<br>`
+       + `${ck(rf==='出租人改善後交屋')}由出租人改善後交屋。<br>`
+       + `${ck(rf==='承租人改善')}由承租人改善。<br>`
+       + `${ck(rf==='現況交屋')}以現況交屋。<br>`
+       + `${ck(rf==='其他')}其他 ${rf==='其他'?fv(val('radFixOther'),5):'____'}。`;
+  const co = radio('chlOver'), cf = radio('chlFix');
+  c[7] = `${ck(radio('chloride')==='有')}有 ${ck(radio('chloride')==='無')}無 曾經做過鋼筋混凝土中水溶性氯離子含量檢測（例如海砂屋檢測事項）；若有，檢測結果：${radio('chloride')==='有'?fv(val('chlResultText'),6):'______'}。<br>`
+       + `${ck(co==='有')}有 ${ck(co==='無')}無 超過容許值含量，若有超過之處理：<br>`
+       + `${ck(cf==='出租人修繕後交屋')}由出租人修繕後交屋。<br>`
+       + `${ck(cf==='承租人修繕')}由承租人修繕。<br>`
+       + `${ck(cf==='現況交屋')}以現況交屋。<br>`
+       + `${ck(cf==='其他')}其他 ${cf==='其他'?fv(val('chlFixOther'),5):'____'}。`;
+  const db = radio('deathBefore');
   c[8] = `本租賃住宅（專有部分）是否曾發生兇殺、自殺、一氧化碳中毒或其他非自然死亡之情事：<br>`
        + `(1)於產權持有期間 ${ck(radio('death')==='有')}有 ${ck(radio('death')==='無')}無 曾發生上列情事。<br>`
-       + `(2)於產權持有前<br>□無上列情事。<br>□知道曾發生上列情事。<br>□不知道曾否發生上列情事。`;
+       + `(2)於產權持有前<br>`
+       + `${ck(db==='無')}無上列情事。<br>`
+       + `${ck(db==='知道')}知道曾發生上列情事。<br>`
+       + `${ck(db==='不知道')}不知道曾否發生上列情事。`;
+  const wf = radio('waterFix');
   c[9] = `供水及排水 ${ck(radio('water')==='正常')}是 ${ck(radio('water')==='不正常')}否 正常，若不正常，<br>`
-       + `□由出租人修繕後交屋。<br>□由承租人修繕。<br>□以現況交屋。<br>□其他 ____。`;
-  c[10] = `${ck(radio('rule')==='有')}有 ${ck(radio('rule')==='無')}無 公寓大廈規約或其他住戶應遵行事項；若有，□有 □無 檢附規約或其他住戶應遵行事項。`;
+       + `${ck(wf==='出租人修繕後交屋')}由出租人修繕後交屋。<br>`
+       + `${ck(wf==='承租人修繕')}由承租人修繕。<br>`
+       + `${ck(wf==='現況交屋')}以現況交屋。<br>`
+       + `${ck(wf==='其他')}其他 ${wf==='其他'?fv(val('waterFixOther'),5):'____'}。`;
+  const ra = radio('ruleAttach');
+  c[10] = `${ck(radio('rule')==='有')}有 ${ck(radio('rule')==='無')}無 公寓大廈規約或其他住戶應遵行事項；若有，${ck(ra==='有')}有 ${ck(ra==='無')}無 檢附規約或其他住戶應遵行事項。`;
   const fee = val('mgmtFee');
   c[11] = `${ck(radio('mgmt')==='有')}有 ${ck(radio('mgmt')==='無')}無 管理委員會統一管理，<br>`
        + `若有<br>`
@@ -873,16 +1028,20 @@ function buildConfirm(){
 
 /* ---- 第 12 項：附屬設備清單（雙欄無框內表，PDF/Word 皆能並排）---- */
 function eqCellHTML(){
+  const list = collectEquipment();
+  const note = val('eqNote');
+  if(!list.length){
+    let h = `本租賃住宅無附屬設備。`;
+    if(note) h += `<div style="margin-top:6px">備註：${esc(note)}</div>`;
+    return h;
+  }
   let h = `附屬設備項目如下：`;
   h += `<table class="eq-inner"><tr>`;
-  EQUIPMENT.forEach((e,i)=>{
-    const on = chk('eq_'+e.key);
-    const q = (on && e.unit) ? ` ${val('eqq_'+e.key)||''} ${e.unit}` : '';
-    h += `<td>${ck(on)}${e.name}${q}</td>`;
+  list.forEach((e,i)=>{
+    h += `<td>■${esc(e.name)}${e.q?' '+esc(e.q):''}</td>`;
     if(i%2===1) h += `</tr><tr>`;   // 每兩格換列
   });
   h += `</tr></table>`;
-  const note = val('eqNote');
   if(note) h += `<div style="margin-top:6px">備註：${esc(note)}</div>`;
   return h;
 }
@@ -941,9 +1100,26 @@ function buildPhotos(){
   return h;
 }
 
+/* ---- 懸掛縮排（首行突出）----
+ * 讓帶有項目符號的條文段落，換行後對齊「符號後第一個字」（而非退回符號處）。
+ * 偵測 .ind / .ind2 段落開頭的括號項目符號（全形（一）／半形(一)／(十一) 等），
+ * 量出符號寬度（全形字算 1em、半形字算 0.5em），以「負首行縮排 + 等寬左邊距」達成。
+ * 用 inline 樣式覆寫 class 的 margin-left，故 PDF（列印）與 Word 匯出皆能呈現。
+ * 各類段落的基礎縮排：.ind=1.6em、.ind2=3em。                                 */
+const HANG_BASE = { ind: 1.6, ind2: 3 };
+function applyHangingIndent(html){
+  // 僅匹配「緊接段落開頭」的括號項目符號（中間 1～4 字），避免誤抓內文中的括號
+  return html.replace(/<p class="(ind2?)">(（[^）]{1,4}）|\([^)]{1,4}\))/g, (full, cls, mk) => {
+    let w = 0;
+    for(const ch of mk) w += (ch.charCodeAt(0) < 128 ? 0.5 : 1);   // 半形 0.5em、全形 1em
+    const ml = (HANG_BASE[cls] + w).toFixed(2);
+    return `<p class="${cls}" style="margin-left:${ml}em;text-indent:-${w}em">${mk}`;
+  });
+}
+
 /* ---- 動作 ---- */
 function generate(){
-  $('#contractDoc').innerHTML = buildContract();
+  $('#contractDoc').innerHTML = applyHangingIndent(buildContract());
   $('#formArea').style.display='none';
   $('#contract').classList.add('show');
   $('#printTip').style.display='block';
@@ -1031,6 +1207,7 @@ function toast(msg){
 buildUI();
 togglePark();
 togglePay();
+toggleConf();
 </script>
 </body>
 </html>
