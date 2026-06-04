@@ -66,6 +66,34 @@
   .party-row .party-rm:hover{color:var(--clay)}
   .party-add{margin-top:8px}
 
+  /* 身分證 OCR 上傳辨識區（每位當事人一個） */
+  .ocr-zone{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:8px;
+    padding:9px 12px;background:var(--bg2);border:1px dashed var(--clay);border-radius:10px}
+  .ocr-btn{cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0}
+  .ocr-btn.busy{opacity:.55;pointer-events:none}
+  .ocr-zone.drag{border-style:solid;border-color:var(--clay);background:#FCF4EE}
+  .ocr-status{font-size:12.5px;color:var(--ink-soft)}
+  .ocr-status.err{color:var(--clay-d)}
+  .ocr-hint{font-size:12px;color:var(--ink-soft);flex-basis:100%}
+  .ocr-raw{flex-basis:100%;margin-top:2px;font-size:12px;color:var(--ink-soft)}
+  .ocr-raw summary{cursor:pointer}
+  .ocr-raw pre{white-space:pre-wrap;word-break:break-all;background:#fff;border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;max-height:160px;overflow:auto;font-family:var(--sans);font-size:11.5px;margin:6px 0 0}
+  /* OCR 帶入的欄位以橘底標示，提醒人工核對 */
+  input.ocr-filled,select.ocr-filled{background:#FCF4EE;border-color:var(--clay)}
+
+  /* 身分證 OCR：框選範圍視窗（去掉黑邊/條碼/浮水印，大幅提升辨識率） */
+  .ocr-crop{position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;background:rgba(20,16,12,.85);padding:16px}
+  .ocr-crop.show{display:flex}
+  .ocr-crop-head{color:#fff;font-size:13.5px;max-width:860px;text-align:center;line-height:1.7}
+  .ocr-crop-stage{position:relative;touch-action:none;background:#000;cursor:crosshair;line-height:0;
+    box-shadow:0 10px 36px rgba(0,0,0,.55)}
+  .ocr-crop-stage img{display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+  .ocr-crop-sel{position:absolute;border:2px dashed #fff;background:rgba(255,255,255,.10);
+    box-shadow:0 0 0 9999px rgba(0,0,0,.5);pointer-events:none}
+  .ocr-crop-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
   /* 現場照片縮圖牆（表單預覽用） */
   .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}
   .photo-thumb{position:relative;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:#FFFDF9}
@@ -219,7 +247,7 @@
     <!-- 1. 當事人 -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>當事人</div>
-      <div class="module-desc">出租人與承租人基本資料（之後可加身分證上傳自動帶入）。共有人或多名承租人請按「＋新增」加列。</div>
+      <div class="module-desc">出租人與承租人基本資料。每位下方可<strong>上傳／拍攝身分證</strong>自動帶入姓名、身分證字號、戶籍地址（影像僅在本機辨識、不上傳，結果為草稿須核對）。共有人或多名承租人請按「＋新增」加列。</div>
 
       <label class="lbl" style="color:var(--teal-d);font-size:13.5px">出租人（甲方）</label>
       <div id="lessorList"></div>
@@ -588,6 +616,20 @@
   </footer>
 </div>
 
+<!-- 身分證 OCR：框選範圍視窗 -->
+<div class="ocr-crop" id="ocrCrop">
+  <div class="ocr-crop-head">拖曳框出證件範圍（盡量框住資料、去掉黑邊／條碼／浮水印，辨識更準）。不重畫也可直接按「辨識框選範圍」用預設框；或選「整張辨識」。</div>
+  <div class="ocr-crop-stage" id="ocrCropStage">
+    <img id="ocrCropImg" alt="">
+    <div class="ocr-crop-sel" id="ocrCropSel"></div>
+  </div>
+  <div class="ocr-crop-actions">
+    <button class="btn" id="ocrCropOk">辨識框選範圍</button>
+    <button class="btn ghost" id="ocrCropFull">整張辨識</button>
+    <button class="btn ghost" id="ocrCropCancel">取消這張</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="rent-data.js"></script>
@@ -633,6 +675,14 @@ function addParty(role, data){
       <div class="field"><label class="lbl">戶籍地址</label><input type="text" class="p-addr" ${idAttr('addr')} value="${esc(data.addr||'')}"></div>
       <div class="field sm"><label class="lbl">聯絡電話</label><input type="text" class="p-tel" ${idAttr('tel')} value="${esc(data.tel||'')}"></div>
       ${isFirst ? '' : `<button type="button" class="eq-rm party-rm" onclick="removeParty('${rid}')" title="移除此${cap}">×</button>`}
+    </div>
+    <div class="ocr-zone" ondragover="ocrDragOver(event,this)" ondragleave="ocrDragLeave(this)" ondrop="ocrDrop('${rid}',event,this)">
+      <label class="btn ghost sm ocr-btn">📷 掃描身分證（正／反面，可一次多選）
+        <input type="file" accept="image/*" multiple style="display:none" onchange="scanId('${rid}', event)">
+      </label>
+      <span class="ocr-status" id="ocrst_${rid}"></span>
+      <span class="ocr-hint">正面帶姓名、身分證字號；反面帶戶籍地址。上傳後會請你<strong>框選範圍</strong>（去黑邊／條碼／浮水印更準；想要姓名準，就把框縮到只罩住姓名那一列）。電腦可<strong>直接把照片拖曳到此區</strong>。首次需下載中文模型。</span>
+      <details class="ocr-raw" id="ocrraw_${rid}" style="display:none"><summary>辨識原文（核對 / 手動複製用）</summary><pre></pre></details>
     </div>`;
   list.appendChild(div);
 }
@@ -1169,6 +1219,264 @@ function applyHangingIndent(html){
     const ml = (HANG_BASE[cls] + w).toFixed(2);
     return `<p class="${cls}" style="margin-left:${ml}em;text-indent:-${w}em">${mk}`;
   });
+}
+
+/* ============================================================
+ * 身分證 OCR（第二階段 ①）— 純前端、影像不外傳
+ *  上傳／拍攝身分證 → Tesseract.js 在本機辨識 → 帶入姓名 / 身分證字號 / 戶籍地址。
+ *  辨識結果一律視為「草稿」，帶入的欄位以橘底（.ocr-filled）標示，務必人工核對。
+ *  函式庫用時才以 CDN 載入，不拖慢首次開頁（維持零後端、零建置）。
+ * ============================================================ */
+const OCR_TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+
+// 動態載入外部 script（每個網址只載一次）
+const _ocrScripts = {};
+function loadScript(url){
+  if(_ocrScripts[url]) return _ocrScripts[url];
+  return _ocrScripts[url] = new Promise((res,rej)=>{
+    const s = document.createElement('script');
+    s.src = url; s.onload = res; s.onerror = ()=>rej(new Error('載入失敗：'+url));
+    document.head.appendChild(s);
+  });
+}
+
+// Tesseract worker 單例：避免每次重建、重複下載中文模型（chi_tra）
+let _tessWorker = null;
+let _ocrProgress = null;   // 目前進度回呼（單例 worker 的 logger 讀這個）
+async function getTessWorker(){
+  await loadScript(OCR_TESSERACT_CDN);
+  if(!_tessWorker){
+    _tessWorker = (async () => {
+      const w = await Tesseract.createWorker('chi_tra+eng', 1, {
+        logger: m => { if(_ocrProgress && m.status === 'recognizing text') _ocrProgress(m.progress); }
+      });
+      // PSM 6＝把整塊當「單一文字區塊」（含多行），對證件裁切通常比預設自動分版穩
+      await w.setParameters({ tessedit_pageseg_mode: '6' });
+      return w;
+    })();
+  }
+  return _tessWorker;
+}
+
+// 對單張影像（File / dataURL / canvas）做 OCR，回傳純文字
+async function ocrImage(image, onProgress){
+  const worker = await getTessWorker();
+  _ocrProgress = onProgress || null;
+  try{
+    const { data:{ text } } = await worker.recognize(image);
+    return text;
+  } finally { _ocrProgress = null; }
+}
+
+// 讀檔成 Image 物件
+function loadImageFile(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = e => { const img = new Image(); img.onload = ()=>res(img); img.onerror = rej; img.src = e.target.result; };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* 影像前處理：縮放到合理解析度 → 轉灰階 → 對比拉伸（min-max 正規化）。
+ * 接受已載入的影像或 canvas（通常是使用者框選後的證件範圍）。
+ * 框選已去除黑背景，對比拉伸這時才真正有效。 */
+function processForOcr(src){
+  let w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+  // 目標最長邊約 1600px：太大縮小（省時）；框得小（如只框姓名）則「放大」最多 3 倍，
+  //  讓字夠大，Tesseract 對複雜字（如「儒」）辨識更準。
+  const target = 1600;
+  const s = Math.max(0.3, Math.min(3, target / Math.max(w, h)));
+  w = Math.max(1, Math.round(w*s)); h = Math.max(1, Math.round(h*s));
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';   // 放大時較平滑
+  ctx.drawImage(src, 0, 0, w, h);
+  const imgData = ctx.getImageData(0, 0, w, h), d = imgData.data;
+  let min = 255, max = 0;
+  for(let i=0;i<d.length;i+=4){
+    const g = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114) | 0;  // 灰階
+    d[i]=d[i+1]=d[i+2]=g;
+    if(g<min) min=g; if(g>max) max=g;
+  }
+  const range = Math.max(1, max-min);
+  for(let i=0;i<d.length;i+=4){
+    const g = (d[i]-min) * 255 / range;               // 對比拉伸
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return cv;
+}
+
+/* 框選範圍：跳出視窗讓使用者在影像上拖出一個框，回傳「框內」原始解析度的 canvas。
+ *  - 按「辨識框選範圍」→ 回傳框內（框太小則視為整張）。
+ *  - 按「整張辨識」→ 回傳整張。
+ *  - 按「取消這張」→ 回傳 null。
+ *  以原圖解析度裁切（非縮圖），保留最多細節給 OCR。支援滑鼠與觸控（Pointer Events）。 */
+function cropImage(file){
+  return new Promise(resolve => {
+    loadImageFile(file).then(img => {
+      const modal = $('#ocrCrop'), stage = $('#ocrCropStage'), elImg = $('#ocrCropImg'), sel = $('#ocrCropSel');
+      const natW = img.naturalWidth, natH = img.naturalHeight;
+      // 顯示尺寸：塞進螢幕（最寬 900 / 視窗 92%，最高 60% 視窗）
+      const ds = Math.min(Math.min(window.innerWidth*0.92, 900)/natW, window.innerHeight*0.6/natH, 1);
+      const dispW = Math.round(natW*ds), dispH = Math.round(natH*ds);
+      elImg.src = img.src; elImg.width = dispW; elImg.height = dispH;
+      stage.style.width = dispW+'px'; stage.style.height = dispH+'px';
+      // 預設框：內縮 6%（使用者可直接微調或重畫）
+      let box = { x: dispW*0.06, y: dispH*0.06, w: dispW*0.88, h: dispH*0.88 };
+      const drawSel = () => { sel.style.left=box.x+'px'; sel.style.top=box.y+'px'; sel.style.width=box.w+'px'; sel.style.height=box.h+'px'; };
+      drawSel();
+      modal.classList.add('show');
+
+      // 拖曳畫新框（在 stage 內以顯示座標計算）
+      let drag = null;
+      const pt = e => { const r = stage.getBoundingClientRect();
+        return { x: Math.max(0, Math.min(dispW, e.clientX-r.left)), y: Math.max(0, Math.min(dispH, e.clientY-r.top)) }; };
+      const onDown = e => { drag = pt(e); box = {x:drag.x, y:drag.y, w:0, h:0}; drawSel(); stage.setPointerCapture(e.pointerId); };
+      const onMove = e => { if(!drag) return; const p = pt(e);
+        box = { x:Math.min(drag.x,p.x), y:Math.min(drag.y,p.y), w:Math.abs(p.x-drag.x), h:Math.abs(p.y-drag.y) }; drawSel(); };
+      const onUp = () => { drag = null; };
+      stage.addEventListener('pointerdown', onDown);
+      stage.addEventListener('pointermove', onMove);
+      stage.addEventListener('pointerup', onUp);
+
+      const cleanup = () => {
+        modal.classList.remove('show');
+        stage.removeEventListener('pointerdown', onDown);
+        stage.removeEventListener('pointermove', onMove);
+        stage.removeEventListener('pointerup', onUp);
+        $('#ocrCropOk').onclick = $('#ocrCropFull').onclick = $('#ocrCropCancel').onclick = null;
+      };
+      // 由原圖（原始解析度）裁出指定區域
+      const cropTo = (sx,sy,sw,sh) => {
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(sw)); cv.height = Math.max(1, Math.round(sh));
+        cv.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+        return cv;
+      };
+      $('#ocrCropOk').onclick = () => {
+        const small = box.w < 10 || box.h < 10;                 // 框太小→當整張
+        const x = small?0:box.x, y = small?0:box.y, w = small?dispW:box.w, h = small?dispH:box.h;
+        cleanup(); resolve(cropTo(x/ds, y/ds, w/ds, h/ds));     // 顯示座標 ÷ 縮放比 → 原圖座標
+      };
+      $('#ocrCropFull').onclick = () => { cleanup(); resolve(cropTo(0, 0, natW, natH)); };
+      $('#ocrCropCancel').onclick = () => { cleanup(); resolve(null); };
+    });
+  });
+}
+
+/* 解析身分證辨識文字 → {name, id, addr}
+ * - 身分證字號：1 英文字母 + 性別碼(1/2) + 8 碼數字，最穩定，先抓這個。
+ * - 姓名：靠「姓名」標籤後 2～4 個中文字。
+ * - 戶籍地址（反面）：抓含「縣／市…號」的最長中文地址字串。
+ * 中文姓名、地址辨識率較不穩，抓不到時留空，由使用者看原文手動補。 */
+/* Tesseract chi_tra 偶爾把字吐成簡體（如 號→号、樓→楼、區→区），
+ * 會同時害到「顯示」與「以繁體字當錨點的比對」。解析前先做簡→繁正規化。
+ * 僅收一對一、不致誤改姓名的字；模糊對應（后/台/范/余/谷…）刻意不收，避免改錯姓名。 */
+const S2T = {'区':'區','号':'號','楼':'樓','邻':'鄰','镇':'鎮','乡':'鄉','县':'縣','园':'園','华':'華',
+  '东':'東','龙':'龍','凤':'鳳','丰':'豐','兴':'興','长':'長','门':'門','阳':'陽','阴':'陰','桥':'橋',
+  '树':'樹','庄':'莊','万':'萬','湾':'灣','学':'學','国':'國','农':'農','车':'車','头':'頭','卫':'衛',
+  '齐':'齊','静':'靜','实':'實','宝':'寶','简':'簡','旧':'舊','应':'應','龟':'龜','广':'廣','营':'營'};
+const s2t = s => (s||'').replace(/[一-鿿]/g, c => S2T[c] || c);
+
+function parseIdCard(text){
+  const out = {};
+  text = s2t(text);                       // 先簡→繁，後續比對才不會因簡體字落空
+  const flat = text.replace(/\s+/g,'');
+  // 身分證字號（最穩）：英文字母 + 性別碼(1/2) + 8 碼數字
+  const mId = flat.match(/[A-Z][12]\d{8}/);
+  if(mId) out.id = mId[0];
+  // 清掉空白與常見 OCR 雜訊標點，讓「名」「縣市」當錨點時不被空格切斷
+  const stripJunk = s => s.replace(/[ \t.,#|，。、·:：!！?？*\\/_=~^"'`’()（）\[\]]+/g,'');
+  // 姓名：以「姓」或「名」標籤當錨點，抓後面 2～3 個中文字（台灣姓名多 2～3 字，
+  //  上限收 3 字避免貪婪多吃到後方雜訊；複姓四字者請手動補）。先試「姓名?」再試「名」。
+  //  ※ 整張掃描常連「姓名」標籤都讀不到（無錨點），此時抓不到屬正常，請手動填或改框小範圍。
+  const compactName = stripJunk(text);
+  const mName = compactName.match(/姓名?([一-鿿]{2,3})/) || compactName.match(/名([一-鿿]{2,3})/);
+  if(mName) out.name = mName[1];
+  // 戶籍地址：身分證地址常跨兩行（第一行 縣市區里鄰、第二行 街號樓）。
+  //  逐行找出含「區/鄉/鎮」的地址起始行，再把後續含 街/路/段/巷/弄/號/樓 的續行併入。
+  //  不強制要有「號」（OCR 偶爾漏門牌數字）；屬草稿，需核對。
+  const lines = text.split(/\r?\n/).map(stripJunk).filter(l => l.length);
+  for(let i=0;i<lines.length;i++){
+    if(/[一-鿿]{2}[縣市][一-鿿]{1,4}[區鄉鎮市]/.test(lines[i])){
+      const m = lines[i].match(/[一-鿿]{2}[縣市].*/);   // 取本行自縣市起的部分（去掉「住址」標籤等前綴）
+      let addr = m ? m[0] : lines[i];
+      for(let j=i+1;j<lines.length && j<=i+2;j++){       // 最多再併兩行地址續行
+        if(/[路街段巷弄號樓]/.test(lines[j])) addr += lines[j];
+        else break;
+      }
+      out.addr = addr;
+      break;
+    }
+  }
+  return out;
+}
+
+// 設定欄位值並標示為 OCR 帶入（橘底）；空值不覆寫，回傳是否有填
+function ocrSet(el, v){ if(!el || !v) return false; el.value = v; el.classList.add('ocr-filled'); return true; }
+
+// 把辨識原文塞進該列的 <details>，供核對 / 手動複製
+function showOcrRaw(id, text){
+  const d = document.getElementById(id);
+  if(!d) return;
+  d.style.display = '';
+  d.querySelector('pre').textContent = text.trim();
+}
+
+/* 掃描某位當事人的身分證：可一次選正反兩面（或分次選），合併辨識後帶入該列 */
+// 由「選檔」按鈕觸發
+function scanId(rid, ev){ const files = [...ev.target.files]; ev.target.value = ''; runIdScan(rid, files); }
+// 桌機：把照片拖曳到上傳區
+function ocrDragOver(e, el){ e.preventDefault(); el.classList.add('drag'); }
+function ocrDragLeave(el){ el.classList.remove('drag'); }
+function ocrDrop(rid, e, el){
+  e.preventDefault(); el.classList.remove('drag');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if(files.length) runIdScan(rid, files);
+}
+
+async function runIdScan(rid, files){
+  if(!files.length) return;
+  const row = document.getElementById(rid);
+  const st  = document.getElementById('ocrst_'+rid);
+  const btn = row?.querySelector('.ocr-btn');
+  if(!row || !st) return;
+  btn?.classList.add('busy');
+  st.className = 'ocr-status';
+  st.textContent = '準備辨識…（首次需下載中文模型，請稍候）';
+  try{
+    let text = '', done = 0;
+    for(const f of files){
+      if(!f.type.startsWith('image/')) continue;
+      st.textContent = '請在跳出的視窗框選證件範圍…';
+      const crop = await cropImage(f);             // 框選證件（去黑邊/條碼/浮水印）
+      if(!crop) continue;                          // 取消這張
+      const proc = processForOcr(crop);            // 灰階＋對比前處理
+      text += await ocrImage(proc, p => { st.textContent = `辨識中… ${Math.round(p*100)}%`; }) + '\n';
+      done++;
+    }
+    if(!done){ st.textContent = '已取消框選'; return; }
+    const d = parseIdCard(text);
+    const filled = [];
+    if(ocrSet(row.querySelector('.p-name'), d.name)) filled.push('姓名');
+    if(ocrSet(row.querySelector('.p-id'),   d.id))   filled.push('身分證字號');
+    if(ocrSet(row.querySelector('.p-addr'), d.addr)) filled.push('戶籍地址');
+    showOcrRaw('ocrraw_'+rid, text);
+    if(filled.length){
+      st.textContent = `已帶入：${filled.join('、')}（草稿，請務必核對）`;
+    } else {
+      st.className = 'ocr-status err';
+      st.textContent = '未能自動辨識欄位，請展開下方原文手動填入';
+    }
+  } catch(e){
+    st.className = 'ocr-status err';
+    st.textContent = '辨識失敗：' + e.message;
+  } finally {
+    btn?.classList.remove('busy');
+  }
 }
 
 /* ---- 動作 ---- */
