@@ -60,6 +60,12 @@
   .eq-item .eq-rm:hover{color:var(--clay)}
   .eq-note-row{margin-top:10px}
 
+  /* 多名當事人：每筆一個區塊，第二筆起上方加分隔線 + 移除鈕 */
+  .party-row + .party-row{margin-top:8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .party-row .party-rm{border:none;background:none;color:var(--ink-soft);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;align-self:center;flex-shrink:0}
+  .party-row .party-rm:hover{color:var(--clay)}
+  .party-add{margin-top:8px}
+
   /* 現場照片縮圖牆（表單預覽用） */
   .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}
   .photo-thumb{position:relative;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:#FFFDF9}
@@ -213,27 +219,15 @@
     <!-- 1. 當事人 -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>當事人</div>
-      <div class="module-desc">出租人與承租人基本資料（之後可加身分證上傳自動帶入）。</div>
+      <div class="module-desc">出租人與承租人基本資料（之後可加身分證上傳自動帶入）。共有人或多名承租人請按「＋新增」加列。</div>
 
       <label class="lbl" style="color:var(--teal-d);font-size:13.5px">出租人（甲方）</label>
-      <div class="row">
-        <div class="field"><label class="lbl">姓名</label><input type="text" id="lessorName"></div>
-        <div class="field"><label class="lbl">統一編號／身分證字號</label><input type="text" id="lessorId"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label class="lbl">戶籍地址</label><input type="text" id="lessorAddr"></div>
-        <div class="field sm"><label class="lbl">聯絡電話</label><input type="text" id="lessorTel"></div>
-      </div>
+      <div id="lessorList"></div>
+      <button type="button" class="btn ghost sm party-add" onclick="addParty('lessor')">＋ 新增出租人</button>
 
-      <label class="lbl" style="color:var(--teal-d);font-size:13.5px;margin-top:8px">承租人（乙方）</label>
-      <div class="row">
-        <div class="field"><label class="lbl">姓名</label><input type="text" id="lesseeName"></div>
-        <div class="field"><label class="lbl">統一編號／身分證字號</label><input type="text" id="lesseeId"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label class="lbl">戶籍地址</label><input type="text" id="lesseeAddr"></div>
-        <div class="field sm"><label class="lbl">聯絡電話</label><input type="text" id="lesseeTel"></div>
-      </div>
+      <label class="lbl" style="color:var(--teal-d);font-size:13.5px;margin-top:10px">承租人（乙方）</label>
+      <div id="lesseeList"></div>
+      <button type="button" class="btn ghost sm party-add" onclick="addParty('lessee')">＋ 新增承租人</button>
     </section>
 
     <!-- 2. 租賃標的（第一條） -->
@@ -611,6 +605,52 @@ const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const fv = (v,w=3) => { v=(v==null?'':String(v)).trim(); return v ? `<span class="fv">${esc(v)}</span>` : `<span class="bl" style="min-width:${w}em"></span>`; };
 const ck = b => b ? '■' : '□';
 
+/* ---- 多名當事人（出租人 / 承租人）---- */
+// 第一筆沿用原有固定 id，讓 loadSample 等既有引用不受影響；第二筆起只用 class 收集。
+let partyCount = {lessor:0, lessee:0};
+function addParty(role, data){
+  data = data || {};
+  const list = document.getElementById(role+'List');
+  if(!list) return;
+  const idx = partyCount[role]++;
+  const isFirst = idx === 0;
+  const cap = role==='lessor' ? '出租人' : '承租人';
+  // 第一筆保留與舊版相同的 id（lessorName / lesseeName ...），其餘只靠 class
+  const ids = isFirst
+    ? {name:role+'Name', id:role+'Id', addr:role+'Addr', tel:role+'Tel'}
+    : {name:'', id:'', addr:'', tel:''};
+  const idAttr = k => ids[k] ? `id="${ids[k]}"` : '';
+  const rid = role+'_party_'+idx;
+  const div = document.createElement('div');
+  div.className = 'party-row';
+  div.id = rid;
+  div.innerHTML = `
+    <div class="row">
+      <div class="field"><label class="lbl">姓名</label><input type="text" class="p-name" ${idAttr('name')} value="${esc(data.name||'')}"></div>
+      <div class="field"><label class="lbl">統一編號／身分證字號</label><input type="text" class="p-id" ${idAttr('id')} value="${esc(data.id||'')}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="lbl">戶籍地址</label><input type="text" class="p-addr" ${idAttr('addr')} value="${esc(data.addr||'')}"></div>
+      <div class="field sm"><label class="lbl">聯絡電話</label><input type="text" class="p-tel" ${idAttr('tel')} value="${esc(data.tel||'')}"></div>
+      ${isFirst ? '' : `<button type="button" class="eq-rm party-rm" onclick="removeParty('${rid}')" title="移除此${cap}">×</button>`}
+    </div>`;
+  list.appendChild(div);
+}
+function removeParty(rid){ document.getElementById(rid)?.remove(); }
+// 收集某角色的所有當事人，過濾全空白的列；至少回傳一筆以維持版面
+function getParties(role){
+  const out = [];
+  document.querySelectorAll('#'+role+'List .party-row').forEach(r=>{
+    const g = sel => (r.querySelector(sel)?.value || '').trim();
+    const p = {name:g('.p-name'), id:g('.p-id'), addr:g('.p-addr'), tel:g('.p-tel')};
+    if(p.name||p.id||p.addr||p.tel) out.push(p);
+  });
+  if(!out.length) out.push({name:'',id:'',addr:'',tel:''});
+  return out;
+}
+// 多名姓名以頓號連接（供開頭句、附件簽章用）
+const partyNames = role => getParties(role).map(p=>fv(p.name,6)).join('、');
+
 /* ---- 各項費用設定（第五條） ---- */
 const FEES = [
   {key:'mgmt', name:'管理費', extra:true},
@@ -658,6 +698,10 @@ function buildUI(){
   $('#bldType').innerHTML = BUILDING_TYPES.map(b=>`<option>${b}</option>`).join('');
   $('#bldType').value = '住宅大樓（十一層含以上有電梯）';
   $('#rentType').innerHTML = RENT_TYPES.map(b=>`<option>${b}</option>`).join('');
+
+  // 當事人：出租人 / 承租人各先放一筆空白列（可按「＋新增」加列）
+  addParty('lessor');
+  addParty('lessee');
 }
 
 function syncEq(key){
@@ -760,16 +804,17 @@ function buildContract(){
   P.push(`<div style="border:1.5px solid #000;padding:12px 16px;font-size:14pt;line-height:2;text-align:left;margin-bottom:14px">`);
   P.push(`<p style="text-align:left;font-weight:700;font-size:14pt;margin:0 0 4px">契約審閱權</p>`);
   P.push(`<p style="text-align:left">本契約於中華民國 ${fv(val('revY'),2.5)} 年 ${fv(val('revM'),2)} 月 ${fv(val('revD'),2)} 日經承租人攜回審閱 ${fv(val('revDays'),1.5)} 日（契約審閱期間至少三日）。</p>`);
-  // 承租人、出租人分兩行
-  P.push(`<p style="text-align:left">承租人：${fv(val('lesseeName'),6)}　（簽章）</p>`);
-  P.push(`<p style="text-align:left">出租人：${fv(val('lessorName'),6)}　（簽章）</p>`);
+  // 承租人、出租人各一段；多名同段以頓號連接，標籤只寫一次。
+  // （不用負 text-indent 懸掛縮排——Word 會把負縮排推出方框外；簽章欄名字短不需換行對齊）
+  P.push(`<p style="text-align:left">承租人：${partyNames('lessee')}　（簽章）</p>`);
+  P.push(`<p style="text-align:left">出租人：${partyNames('lessor')}　（簽章）</p>`);
   P.push(`</div>`);
   // 住宅租賃契約書 — 置中、42pt 加粗，置於出租人下方
   P.push(`<h1 class="ct-title" style="font-size:42pt;font-weight:900;margin:2.6cm 0 0">住宅租賃契約書</h1>`);
 
   // 審閱頁獨立成一頁，合約本文從次頁開始（本文不再重複大標題）
   P.push(`<div class="pgbreak"></div>`);
-  P.push(`<p>立契約書人承租人 ${fv(val('lesseeName'),6)} ，出租人 ${fv(val('lessorName'),6)} 【為 ${ck(owner==='所有權人')}所有權人 ${ck(owner==='轉租人')}轉租人（應提示經原所有權人同意轉租之證明文件）】，茲為住宅租賃事宜，雙方同意本契約條款如下：</p>`);
+  P.push(`<p>立契約書人承租人 ${partyNames('lessee')} ，出租人 ${partyNames('lessor')} 【為 ${ck(owner==='所有權人')}所有權人 ${ck(owner==='轉租人')}轉租人（應提示經原所有權人同意轉租之證明文件）】，茲為住宅租賃事宜，雙方同意本契約條款如下：</p>`);
 
   // 第一條
   P.push(`<p class="ct-clause">第一條　租賃標的</p>`);
@@ -885,15 +930,21 @@ function buildContract(){
   // 簽署
   P.push(`<div class="sig-block">`);
   P.push(`<p style="font-weight:700">立契約書人</p>`);
-  P.push(`<p>出租人　姓名：${fv(val('lessorName'),6)}（簽章）</p>`);
-  P.push(`<p>　　　　身分證字號：${fv(val('lessorId'),6)}</p>`);
-  P.push(`<p>　　　　戶籍地址：${fv(val('lessorAddr'),14)}</p>`);
-  P.push(`<p>　　　　聯絡電話：${fv(val('lessorTel'),6)}</p>`);
-  P.push(`<p>承租人　姓名：${fv(val('lesseeName'),6)}（簽章）</p>`);
-  P.push(`<p>　　　　身分證字號：${fv(val('lesseeId'),6)}</p>`);
-  P.push(`<p>　　　　戶籍地址：${fv(val('lesseeAddr'),14)}</p>`);
-  P.push(`<p>　　　　聯絡電話：${fv(val('lesseeTel'),6)}</p>`);
-  P.push(`<p style="text-align:center;margin-top:10px">${mdate(val('signY'),val('signM'),val('signD'))}</p>`);
+  // 角色標題（加粗）獨立一行，換行後依序列出該角色每位的姓名與資料；
+  // 多名時不重複角色標籤，只接姓名／身分證字號／戶籍地址／聯絡電話（資料行縮排對齊）
+  const sigRole = (role, label) => {
+    P.push(`<p style="font-weight:700">${label}</p>`);
+    getParties(role).forEach(p=>{
+      P.push(`<p>　　姓名：${fv(p.name,6)}（簽章）</p>`);
+      P.push(`<p>　　身分證字號：${fv(p.id,6)}</p>`);
+      P.push(`<p>　　戶籍地址：${fv(p.addr,14)}</p>`);
+      P.push(`<p>　　聯絡電話：${fv(p.tel,6)}</p>`);
+    });
+  };
+  sigRole('lessor', '出租人');
+  sigRole('lessee', '承租人');
+  // 簽約日期：分散對齊（撐滿整行寬度）。text-align-last 給瀏覽器/PDF；text-justify:distribute-all-lines 給 Word(mso) 認
+  P.push(`<p style="text-align:justify;text-align-last:justify;text-justify:distribute-all-lines;margin-top:10px">${mdate(val('signY'),val('signM'),val('signD'))}</p>`);
   P.push(`</div>`);
 
   // ===== 附件一 現況確認書（含第 12 項附屬設備）=====
@@ -1021,8 +1072,11 @@ function buildConfirm(){
   // 第 12 項：附屬設備（置於表格最後一格）
   h += `<tr><td class="idx">12</td><td>${eqCellHTML()}</td><td class="note"></td></tr>`;
   h += `</table>`;
-  h += `<div class="sig-block"><p>出租人：${fv(val('lessorName'),6)}（簽章）　承租人：${fv(val('lesseeName'),6)}（簽章）</p>`;
-  h += `<p>簽章日期：${mdate(val('signY'),val('signM'),val('signD'))}</p></div>`;
+  // 雙方簽名：出租人、承租人各自一行並加間隔（同一行太擠）
+  h += `<div class="sig-block">`;
+  h += `<p style="margin-bottom:14px">出租人：${partyNames('lessor')}（簽章）</p>`;
+  h += `<p style="margin-bottom:14px">承租人：${partyNames('lessee')}（簽章）</p>`;
+  h += `<p style="text-align:justify;text-align-last:justify;text-justify:distribute-all-lines">簽章日期：${mdate(val('signY'),val('signM'),val('signD'))}</p></div>`;
   return h;
 }
 
