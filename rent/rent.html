@@ -188,7 +188,11 @@
   @media print{
     .site-nav,.hero,#formArea,.action-bar,footer,.print-tip,.toast{display:none !important}
     #contract{display:block !important}
-    .contract-doc{box-shadow:none;border:none;border-radius:0;margin:0;max-width:none;padding:0}
+    /* 手機「存成 PDF」會強制印出背景色，全站米色底（--bg）會在白色合約卡片周圍形成像邊框的色塊；
+       桌機列印預設不印背景故無此問題。強制白底＋移除卡片陰影/邊框，讓留白區與白卡融為一體。 */
+    html,body{background:#fff !important}
+    .contract-doc{box-shadow:none !important;border:none !important;border-radius:0 !important;
+      margin:0 !important;max-width:none !important;padding:0 !important;background:#fff !important}
     @page{size:A4;margin:1.8cm 1.6cm}
   }
 </style>
@@ -264,10 +268,10 @@
       <div class="module-desc">物件門牌、建號、面積、車位。可<strong>上傳電傳／謄本</strong>自動帶入段、地號、建號、門牌、樓層、面積、共有部分（影像僅在本機辨識、不上傳，結果為草稿須核對）。</div>
       <div class="ocr-zone" id="deedZone" ondragover="ocrDragOver(event,this)" ondragleave="ocrDragLeave(this)" ondrop="deedDrop(event,this)">
         <label class="btn ghost sm ocr-btn">📄 上傳電傳／謄本（PDF 或截圖）
-          <input type="file" accept="application/pdf,image/*" style="display:none" onchange="scanDeed(event)">
+          <input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="scanDeed(event)">
         </label>
         <span class="ocr-status" id="ocrst_deed"></span>
-        <span class="ocr-hint"><strong>電子謄本 PDF</strong> 直接讀取文字（最準、免辨識）；掃描 PDF 或截圖照片則走影像辨識。電腦可<strong>把檔案直接拖曳到此區</strong>；手機可上傳檔案或相簿截圖（圖片會請你<strong>框選範圍</strong>）。首次辨識影像需下載中文模型。</span>
+        <span class="ocr-hint"><strong>電子謄本 PDF</strong> 直接讀取文字（最準、免辨識）；掃描 PDF 或截圖照片則走影像辨識。電腦可<strong>把檔案直接拖曳到此區</strong>；手機可上傳檔案或相簿截圖（圖片會請你<strong>框選範圍</strong>）。截圖可<strong>一次選多張</strong>（例如標示部一張、所有權部一張補齊持分），會逐張框選後合併辨識。首次辨識影像需下載中文模型。</span>
         <details class="ocr-raw" id="ocrraw_deed" style="display:none"><summary>辨識／抽取原文（核對 / 手動複製用）</summary><pre></pre></details>
       </div>
       <div class="row">
@@ -1637,6 +1641,9 @@ function normDeed(t){
   t = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); // 全形→半形
   t = t.replace(/－/g, '-');                                                           // 全形連字號→半形
   t = t.replace(/　/g, ' ').replace(/[*]/g, '').replace(/[ \t]+/g, ' ');
+  // OCR（截圖辨識）常在每個中文字之間插入空白，使「建 物 門 牌」對不上標籤錨點。
+  //  去除相鄰中文字之間的空白即可（PDF 文字層無此現象，故對 PDF 解析無影響）。
+  t = t.replace(/(?<=[一-鿿])[ \t]+(?=[一-鿿])/g, '');
   return t;
 }
 
@@ -1671,10 +1678,20 @@ function parseDeed(raw){
   m = T.match(/建物門牌\s*[:：]\s*(.+?)(?=\s*(?:建物坐落|登記原因|主要用途)|\n|$)/);
   if(m){
     let h = m[1].replace(/\s+/g, '').trim();
-    // 門牌常缺縣市區，嘗試由文件開頭的「○縣/市○區」補上
+    // 門牌常缺縣市區，由「建物標示部」補上。務必把搜尋限縮在標示部，
+    //  否則會抓到後面所有權人／他項權利人（如銀行）的住址而補錯縣市。
     if(!/[縣市]/.test(h.slice(0,3))){
-      const c = T.match(/[一-鿿]{2}[縣市][一-鿿]{1,3}[區鄉鎮市]/);
-      if(c) h = c[0] + h;
+      const markEnd = T.search(/建物所有權部|建物他項權利部|所有權人/);
+      const mark = markEnd > 0 ? T.slice(0, markEnd) : T;
+      // 先找完整「○○縣/市○○區」；謄本標示部常只寫「○○區○○段」沒有縣市，
+      //  則由段名取「區」、由管轄／核發機關取「縣市」（同段之地政機關必與不動產同縣市）
+      let pref = (mark.match(/[一-鿿]{2}[縣市][一-鿿]{1,3}[區鄉鎮市]/) || [])[0];
+      if(!pref){
+        const dist = (mark.match(/([一-鿿]{2,3}[區鄉鎮市])[一-鿿]{1,3}段/) || [])[1] || '';
+        const city = (mark.match(/(?:管轄機關|核發機關|登記機關)\s*[:：]\s*([一-鿿]{2}[縣市])/) || [])[1] || '';
+        pref = city + dist;
+      }
+      if(pref) h = pref + h;
     }
     out.addr = h;
   }
@@ -1693,6 +1710,7 @@ function parseDeed(raw){
 
   // 主建物面積：以「層次面積」為準（單層住宅與總面積相同）
   m = T.match(/層次面積\s*[:：]\s*([\d,]+\.\d+)/);
+  if(!m) m = T.match(/總面積\s*[:：]\s*([\d,]+\.\d+)/);   // OCR 偶把「層次面積」讀糊，退而取「總面積」（單層住宅兩者相同）
   if(m) out.mainArea = m[1].replace(/,/g, '');
 
   // 專有權利範圍：所有權部「（全部）N分之N」→ 1/1
@@ -1713,7 +1731,7 @@ function parseDeed(raw){
     const region = T.slice(aIdx, end);
     // 用途與面積依出現順序配對（坪數標「坪」、登記面積標「平方公尺」，只取平方公尺數）
     const uses = region.match(/陽台|雨遮|花台|平台|露台|遮陽板|屋簷/g) || [];
-    const areas = []; let ma2, reA = /([\d]+\.\d+)\s*平方公尺/g;
+    const areas = []; let ma2, reA = /([\d]+\.\d+)\s*平方公[一-鿿]/g;   // 「平方公尺」末字放寬：OCR 常把「尺」讀成「盡／反」
     while((ma2 = reA.exec(region))) areas.push(ma2[1]);
     const n = Math.max(uses.length, areas.length);
     for(let k=0;k<n;k++) out.subs.push({ use: uses[k] || '', area: areas[k] || '' });
@@ -1742,8 +1760,8 @@ function parseDeed(raw){
       const ms = win.match(/(\d{4,7})\s*分之\s*(\d{1,7})/);              // 權利範圍（持分比例）
       const share = ms ? ms[1] + '分之' + ms[2] : '';
       let area = '';
-      const mHold = win.match(/持分\s*([\d,]+\.\d+)\s*平方公尺/);          // 電傳常直接給持分面積
-      const mTot  = win.match(/([\d,]+\.\d+)\s*平方公尺/);                // 否則用共有總面積換算
+      const mHold = win.match(/持分\s*([\d,]+(?:\.\d+)?)\s*平方公[一-鿿]/); // 電傳常直接給持分面積（整數小數皆可；末字放寬容忍 OCR）
+      const mTot  = win.match(/([\d,]+(?:\.\d+)?)\s*平方公[一-鿿]/);       // 否則用共有總面積換算（如 03232 為整數「101平方公尺」）
       if(mHold) area = mHold[1].replace(/,/g, '');
       else if(ms && mTot){ const v = parseFloat(mTot[1].replace(/,/g,'')) * (+ms[2]) / (+ms[1]); if(!isNaN(v)) area = round2(v); }
       out.commons.push({ no: it.no, share, area });
@@ -1754,10 +1772,18 @@ function parseDeed(raw){
   //  編號可能英數混合（如 B2-828）；優先抓「含停車位」脈絡（本戶），避免誤抓全棟車位編號。
   if(/含停車位|停車位編號|車位編號|車位\s*[\d.]+\s*坪/.test(T)){
     out.hasPark = true;
-    const mPk = T.match(/含停車位\s*編號\s*[:：]?\s*([A-Za-z0-9-]+)/)        // 官方 inline「含停車位編號127」
-             || T.match(/含停車位[\s\S]{0,30}?編號\s*[:：]\s*([A-Za-z0-9-]+)/) // foundi「含停車位：…編號：B2-828」
-             || T.match(/車位\s*編號\s*[:：]?\s*([A-Za-z0-9-]+)/);            // 比房「車位編號:180」
-    if(mPk) out.parkNo = mPk[1].replace(/[-]+$/, '');
+    // 本戶車位編號：一戶可能有多個車位（如「含停車位：編號：086…編號：087」）。
+    //  限縮在「含停車位」脈絡內擷取所有編號，避免抓到全棟「停車位共計N位…不予編號」等非本戶資訊。
+    let nums = [];
+    const ctx = T.match(/含停車位[\s\S]{0,180}/);
+    if(ctx){
+      let mp, re = /編號\s*[:：]\s*([A-Za-z0-9-]+)/g;                       // foundi/本案：「編號：086」可多筆
+      while((mp = re.exec(ctx[0])) && nums.length < 12) nums.push(mp[1]);
+      if(!nums.length){ const mi = ctx[0].match(/編號\s*([A-Za-z0-9-]+)/); if(mi) nums.push(mi[1]); } // 官方 inline「含停車位編號127」無冒號
+    }
+    if(!nums.length){ const mb = T.match(/車位\s*編號\s*[:：]?\s*([A-Za-z0-9-]+)/); if(mb) nums.push(mb[1]); } // 比房「車位編號:180」
+    nums = nums.map(n => n.replace(/[-]+$/, '')).filter(Boolean);
+    if(nums.length){ out.parkNo = nums.join('、'); out.carCnt = String(nums.length); }  // 編號多筆以「、」連接，車位數＝筆數
   }
 
   // 他項權利：「權利種類」僅出現在他項權利部，抓到即視為有（多為最高限額抵押權）
@@ -1811,7 +1837,7 @@ function applyDeed(d){
   if(d.hasPark){
     const yes = document.querySelector('input[name="hasPark"][value="有"]');
     if(yes && !yes.checked){ yes.checked = true; togglePark(); }
-    if(!val('carCnt')) ocrSet($('#carCnt'), '1');
+    ocrSet($('#carCnt'), d.carCnt || '1');   // 車位數（多車位謄本帶入實際筆數）
     let s = '車位';
     if(d.parkNo && ocrSet($('#carSpotNo'), d.parkNo)) s = '車位（編號 ' + d.parkNo + '）';
     filled.push(s);
@@ -1830,7 +1856,7 @@ function applyDeed(d){
   return filled;
 }
 
-/* 上傳電傳／謄本：一次處理一份。PDF 先抽文字層，無文字層才退回影像 OCR；圖片走框選＋OCR。 */
+/* 上傳電傳／謄本：PDF 取單一文件先抽文字層，無文字層才退回影像 OCR；截圖可多張，逐張框選＋OCR 後合併。 */
 function scanDeed(ev){ const files = [...ev.target.files]; ev.target.value = ''; runDeedScan(files); }
 function deedDrop(e, el){
   e.preventDefault(); el.classList.remove('drag');
@@ -1840,14 +1866,14 @@ function deedDrop(e, el){
 async function runDeedScan(files){
   files = [...files].filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name) || f.type.startsWith('image/'));
   if(!files.length) return;
-  const f  = files[0];                                   // 一次一份（謄本通常一份就夠）
   const st = $('#ocrst_deed'), btn = $('#deedZone .ocr-btn');
   btn?.classList.add('busy');
   st.className = 'ocr-status';
   try{
     let text = '';
-    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-    if(isPdf){
+    const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if(isPdf(files[0])){
+      const f = files[0];                                // PDF 為單一文件（本身可多頁，故只取第一個）
       st.textContent = '讀取 PDF…';
       const r = await extractPdfText(f, p => { st.textContent = `讀取 PDF 文字… ${Math.round(p*100)}%`; });
       if(r.charCount >= 30){
@@ -1857,11 +1883,17 @@ async function runDeedScan(files){
         text = await ocrPdfPages(f, p => { st.textContent = `辨識中… ${Math.round(p*100)}%`; });
       }
     } else {
-      st.textContent = '請在跳出的視窗框選謄本範圍…';
-      const crop = await cropImage(f);                   // 截圖／拍照：框選
-      if(!crop){ st.textContent = '已取消框選'; return; }
-      st.textContent = '辨識中…（首次需下載中文模型）';
-      text = await ocrImage(processForOcr(crop), p => { st.textContent = `辨識中… ${Math.round(p*100)}%`; });
+      // 截圖／拍照：可一次多張（例如標示部一張、所有權部一張補持分），逐張框選辨識後合併文字再解析
+      const imgs = files.filter(f => f.type.startsWith('image/'));
+      for(let i = 0; i < imgs.length; i++){
+        const tag = imgs.length > 1 ? `（第 ${i+1}/${imgs.length} 張）` : '';
+        st.textContent = `請在跳出的視窗框選謄本範圍…${tag}`;
+        const crop = await cropImage(imgs[i]);            // 逐張框選
+        if(!crop) continue;                               // 這張取消則略過，續處理下一張
+        st.textContent = `辨識中…${tag}（首次需下載中文模型）`;
+        text += await ocrImage(processForOcr(crop), p => { st.textContent = `辨識中…${tag} ${Math.round(p*100)}%`; }) + '\n';
+      }
+      if(!text.trim()){ st.textContent = '已取消框選'; return; }
     }
     const d = parseDeed(text);
     const filled = applyDeed(d);
