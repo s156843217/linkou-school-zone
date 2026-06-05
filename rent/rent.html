@@ -261,7 +261,15 @@
     <!-- 2. 租賃標的（第一條） -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>租賃標的（第一條）</div>
-      <div class="module-desc">物件門牌、建號、面積、車位（之後可加電傳／謄本上傳自動帶入）。</div>
+      <div class="module-desc">物件門牌、建號、面積、車位。可<strong>上傳電傳／謄本</strong>自動帶入段、地號、建號、門牌、樓層、面積、共有部分（影像僅在本機辨識、不上傳，結果為草稿須核對）。</div>
+      <div class="ocr-zone" id="deedZone" ondragover="ocrDragOver(event,this)" ondragleave="ocrDragLeave(this)" ondrop="deedDrop(event,this)">
+        <label class="btn ghost sm ocr-btn">📄 上傳電傳／謄本（PDF 或截圖）
+          <input type="file" accept="application/pdf,image/*" style="display:none" onchange="scanDeed(event)">
+        </label>
+        <span class="ocr-status" id="ocrst_deed"></span>
+        <span class="ocr-hint"><strong>電子謄本 PDF</strong> 直接讀取文字（最準、免辨識）；掃描 PDF 或截圖照片則走影像辨識。電腦可<strong>把檔案直接拖曳到此區</strong>；手機可上傳檔案或相簿截圖（圖片會請你<strong>框選範圍</strong>）。首次辨識影像需下載中文模型。</span>
+        <details class="ocr-raw" id="ocrraw_deed" style="display:none"><summary>辨識／抽取原文（核對 / 手動複製用）</summary><pre></pre></details>
+      </div>
       <div class="row">
         <div class="field lg"><label class="lbl">門牌</label><input type="text" id="addr" placeholder="新北市林口區○○路○號○樓"></div>
       </div>
@@ -277,14 +285,11 @@
       <div class="row">
         <div class="field sm"><label class="lbl">主建物 樓層</label><input type="text" id="mainFloor"></div>
         <div class="field sm"><label class="lbl">主建物面積（㎡）</label><input type="text" id="mainArea"></div>
-        <div class="field sm"><label class="lbl">附屬建物用途</label><input type="text" id="subUse" placeholder="陽台"></div>
-        <div class="field sm"><label class="lbl">附屬建物面積（㎡）</label><input type="text" id="subArea"></div>
       </div>
-      <div class="row">
-        <div class="field sm"><label class="lbl">共有部分建號</label><input type="text" id="commonNo"></div>
-        <div class="field sm"><label class="lbl">權利範圍</label><input type="text" id="commonShare" placeholder="100000分之___"></div>
-        <div class="field sm"><label class="lbl">持分面積（㎡）</label><input type="text" id="commonArea"></div>
-      </div>
+      <div id="subList"></div>
+      <button type="button" class="btn ghost sm" style="margin-top:6px" onclick="addSubRow()">＋ 新增附屬建物（陽台／雨遮…）</button>
+      <div id="commonList"></div>
+      <button type="button" class="btn ghost sm" style="margin-top:6px" onclick="addCommonRow()">＋ 新增共有部分建號</button>
 
       <div class="row"><div class="field lg">
         <label class="lbl">車位</label>
@@ -687,6 +692,65 @@ function addParty(role, data){
   list.appendChild(div);
 }
 function removeParty(rid){ document.getElementById(rid)?.remove(); }
+
+/* ---- 共有部分（可多筆：一棟常有公設、停車空間等多個共有建號）---- */
+let commonCount = 0;
+function addCommonRow(data){
+  data = data || {};
+  const list = document.getElementById('commonList');
+  if(!list) return;
+  const first = commonCount === 0;                 // 第一列保留舊 id，相容 loadSample／合約輸出
+  const idA = first ? 'id="commonNo"' : '', idB = first ? 'id="commonShare"' : '', idC = first ? 'id="commonArea"' : '';
+  const div = document.createElement('div');
+  div.className = 'row common-row';
+  div.innerHTML = `
+    <div class="field sm"><label class="lbl">共有部分建號</label><input type="text" class="c-no" ${idA} value="${esc(data.no||'')}"></div>
+    <div class="field sm"><label class="lbl">權利範圍</label><input type="text" class="c-share" ${idB} placeholder="100000分之___" value="${esc(data.share||'')}"></div>
+    <div class="field sm"><label class="lbl">持分面積（㎡）</label><input type="text" class="c-area" ${idC} value="${esc(data.area||'')}"></div>
+    ${first ? '' : `<button type="button" onclick="this.closest('.common-row').remove()" title="移除此共有部分" style="border:none;background:none;color:var(--ink-soft);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;align-self:center;flex-shrink:0">×</button>`}`;
+  list.appendChild(div);
+  commonCount++;
+  return div;
+}
+// 收集所有共有部分列（過濾全空白）
+function getCommons(){
+  const out = [];
+  document.querySelectorAll('#commonList .common-row').forEach(r => {
+    const g = sel => (r.querySelector(sel)?.value || '').trim();
+    const c = { no:g('.c-no'), share:g('.c-share'), area:g('.c-area') };
+    if(c.no || c.share || c.area) out.push(c);
+  });
+  return out;
+}
+
+/* ---- 附屬建物（可多筆：早期建物常有陽台＋雨遮、花台等，面積各自登記）---- */
+let subCount = 0;
+function addSubRow(data){
+  data = data || {};
+  const list = document.getElementById('subList');
+  if(!list) return;
+  const first = subCount === 0;                     // 第一列保留舊 id（subUse/subArea），相容 loadSample
+  const idU = first ? 'id="subUse"' : '', idA = first ? 'id="subArea"' : '';
+  const div = document.createElement('div');
+  div.className = 'row sub-row';
+  div.innerHTML = `
+    <div class="field sm"><label class="lbl">附屬建物用途</label><input type="text" class="s-use" ${idU} placeholder="陽台" value="${esc(data.use||'')}"></div>
+    <div class="field sm"><label class="lbl">附屬建物面積（㎡）</label><input type="text" class="s-area" ${idA} value="${esc(data.area||'')}"></div>
+    ${first ? '' : `<button type="button" onclick="this.closest('.sub-row').remove()" title="移除此附屬建物" style="border:none;background:none;color:var(--ink-soft);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;align-self:center;flex-shrink:0">×</button>`}`;
+  list.appendChild(div);
+  subCount++;
+  return div;
+}
+// 收集所有附屬建物列（過濾全空白）
+function getSubs(){
+  const out = [];
+  document.querySelectorAll('#subList .sub-row').forEach(r => {
+    const g = sel => (r.querySelector(sel)?.value || '').trim();
+    const s = { use:g('.s-use'), area:g('.s-area') };
+    if(s.use || s.area) out.push(s);
+  });
+  return out;
+}
 // 收集某角色的所有當事人，過濾全空白的列；至少回傳一筆以維持版面
 function getParties(role){
   const out = [];
@@ -872,8 +936,22 @@ function buildContract(){
   P.push(`<p class="ind2">1、門牌：${fv(val('addr'),12)}。基地坐落 ${fv(val('landSeg'),4)} 段 ${fv(val('landNo'),5)} 地號。</p>`);
   P.push(`<p class="ind2">2、專有部分建號 ${fv(val('exclNo'),5)} ，權利範圍 ${fv(val('exclShare'),3)} ，面積共計 ${fv(val('exclArea'),3)} 平方公尺。</p>`);
   P.push(`<p class="ind2">　(1)主建物面積：${fv(val('mainFloor'),2)} 層 ${fv(val('mainArea'),3)} 平方公尺。</p>`);
-  P.push(`<p class="ind2">　(2)附屬建物用途 ${fv(val('subUse'),3)} ，面積 ${fv(val('subArea'),3)} 平方公尺。</p>`);
-  P.push(`<p class="ind2">3、共有部分建號 ${fv(val('commonNo'),5)} ，權利範圍 ${fv(val('commonShare'),5)} ，持分面積 ${fv(val('commonArea'),3)} 平方公尺。</p>`);
+  const subs = getSubs();
+  if(subs.length <= 1){
+    const s0 = subs[0] || { use:val('subUse'), area:val('subArea') };
+    P.push(`<p class="ind2">　(2)附屬建物用途 ${fv(s0.use,3)} ，面積 ${fv(s0.area,3)} 平方公尺。</p>`);
+  } else {
+    P.push(`<p class="ind2">　(2)附屬建物：</p>`);
+    subs.forEach(s => P.push(`<p class="ind2">　　用途 ${fv(s.use,3)} ，面積 ${fv(s.area,3)} 平方公尺。</p>`));
+  }
+  const commons = getCommons();
+  if(commons.length <= 1){
+    const c0 = commons[0] || { no:val('commonNo'), share:val('commonShare'), area:val('commonArea') };
+    P.push(`<p class="ind2">3、共有部分建號 ${fv(c0.no,5)} ，權利範圍 ${fv(c0.share,5)} ，持分面積 ${fv(c0.area,3)} 平方公尺。</p>`);
+  } else {
+    P.push(`<p class="ind2">3、共有部分：</p>`);
+    commons.forEach((c,i) => P.push(`<p class="ind2">　(${i+1})建號 ${fv(c.no,5)} ，權利範圍 ${fv(c.share,5)} ，持分面積 ${fv(c.area,3)} 平方公尺。</p>`));
+  }
   const hasPark = radio('hasPark')==='有';
   P.push(`<p class="ind2">4、車位：${ck(hasPark)}有（汽車停車位 ${fv(val('carCnt'),2)} 個、機車停車位 ${fv(val('motoCnt'),2)} 個）${ck(!hasPark)}無。</p>`);
   P.push(`<p class="ind2">5、${ck(radio('otherRight')==='有')}有 ${ck(radio('otherRight')==='無')}無 設定他項權利${radio('otherRight')==='有'?'，權利種類：'+fv(val('otherRightKind'),4):''}。</p>`);
@@ -1228,6 +1306,8 @@ function applyHangingIndent(html){
  *  函式庫用時才以 CDN 載入，不拖慢首次開頁（維持零後端、零建置）。
  * ============================================================ */
 const OCR_TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const OCR_PDFJS_CDN    = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+const OCR_PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 // 動態載入外部 script（每個網址只載一次）
 const _ocrScripts = {};
@@ -1479,6 +1559,330 @@ async function runIdScan(rid, files){
   }
 }
 
+/* ============================================================
+ * 電傳／謄本辨識（第二階段 ②）— 純前端、影像不外傳
+ *  ① 電子謄本 PDF：用 PDF.js 直接抽「文字層」→ 最準、免 OCR。
+ *  ② 掃描 PDF（無文字層）：PDF.js 把頁面 render 成影像 → 走 Tesseract OCR。
+ *  ③ 截圖／拍照圖檔：框選範圍 → 影像前處理 → OCR。
+ *  解析（parseDeed）以「標籤」為錨點，已對地政正式謄本、ibigfun（比房）、
+ *  foundi（房地）三種電傳格式校準；全形數字、「*」填充、全形空白皆先正規化。
+ *  帶入欄位一律視為草稿（橘底 .ocr-filled），務必人工核對。
+ * ============================================================ */
+
+// PDF.js 單例：載入 UMD 版並設定 worker 路徑（worker 在 file:// 下會被擋，需用 http 開）
+let _pdfjs = null;
+async function getPdfLib(){
+  await loadScript(OCR_PDFJS_CDN);
+  if(!_pdfjs){
+    _pdfjs = window.pdfjsLib;
+    _pdfjs.GlobalWorkerOptions.workerSrc = OCR_PDFJS_WORKER;
+  }
+  return _pdfjs;
+}
+
+/* 由 PDF.js 的 getTextContent 重建「每行文字」：
+ * 依每個文字片段的 y 座標分行（容差 3），同一行內再依 x 由左到右排序後接合。
+ * 接合不補空白（中文不需要），跨欄的標籤靠後續 regex 各自尋找。 */
+function reconstructLines(items){
+  const rows = [];
+  items.forEach(it => {
+    if(!it.str) return;
+    const y = Math.round(it.transform[5]), x = it.transform[4];
+    let row = rows.find(r => Math.abs(r.y - y) <= 3);
+    if(!row){ row = { y, parts: [] }; rows.push(row); }
+    row.parts.push({ x, s: it.str });
+  });
+  rows.sort((a,b) => b.y - a.y);                 // y 大者在上（PDF 座標原點在左下）
+  return rows.map(r => { r.parts.sort((a,b)=>a.x-b.x); return r.parts.map(p=>p.s).join(''); });
+}
+
+// 抽取 PDF 文字層（全部頁），回傳 {text, charCount}
+async function extractPdfText(file, onProgress){
+  const lib = await getPdfLib();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  let lines = [];
+  for(let i=1;i<=pdf.numPages;i++){
+    const tc = await (await pdf.getPage(i)).getTextContent();
+    lines = lines.concat(reconstructLines(tc.items));
+    onProgress && onProgress(i / pdf.numPages);
+  }
+  const text = lines.join('\n');
+  return { text, charCount: text.replace(/\s/g,'').length };
+}
+
+// 掃描 PDF（無文字層）：把頁面 render 成影像再 OCR（最多前 3 頁，避免過久）
+async function ocrPdfPages(file, onProgress){
+  const lib = await getPdfLib();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const n = Math.min(pdf.numPages, 3);
+  let text = '';
+  for(let i=1;i<=n;i++){
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({ scale: 2 });   // 放大 2 倍提高辨識率
+    const cv = document.createElement('canvas');
+    cv.width = vp.width; cv.height = vp.height;
+    await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    text += await ocrImage(processForOcr(cv), p => onProgress && onProgress((i-1+p)/n)) + '\n';
+  }
+  return text;
+}
+
+/* 謄本文字正規化：簡→繁、全形數字/英文→半形、全形空白→半形、去掉「*」填充。
+ * 之後的 regex 都跑在正規化後的文字上。 */
+function normDeed(t){
+  t = s2t(t || '');
+  t = t.replace(/\r\n?/g, '\n');                                                       // 統一換行
+  t = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); // 全形→半形
+  t = t.replace(/－/g, '-');                                                           // 全形連字號→半形
+  t = t.replace(/　/g, ' ').replace(/[*]/g, '').replace(/[ \t]+/g, ' ');
+  return t;
+}
+
+/* 中文樓層 → 阿拉伯數字（十四→14、九→9）；非單純樓層（地下、突出物）保留原字。
+ *  注意：中文數字碼位不連續（四/六/八 落在「九」之後），不能用 [一-九] 範圍，須列舉。 */
+function cnFloor(s){
+  s = (s || '').replace(/[層樓]/g, '').trim();
+  if(/^\d+$/.test(s)) return s;
+  const d = {零:0,一:1,二:2,兩:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
+  if(s === '十') return '10';
+  let m = s.match(/^十([一二三四五六七八九])$/);            if(m) return String(10 + d[m[1]]);
+  m = s.match(/^([一二三四五六七八九])十([一二三四五六七八九]?)$/); if(m) return String(d[m[1]]*10 + (m[2]?d[m[2]]:0));
+  if(d[s] != null) return String(d[s]);
+  return s;
+}
+
+/* 解析謄本文字 → 物件欄位。以標籤為錨點，盡量通吃三種格式。
+ *  建號 5-3（09883-000）、地號 4-4（0937-0000）格式不同，可分辨。
+ *  抓不到的欄位留空，由使用者看原文手動補；屬草稿、須核對。 */
+function parseDeed(raw){
+  const T = normDeed(raw);
+  const out = {};
+
+  // 段名正規化：標題「林口區力行段」會把「區」吃進來，去掉縣市區鄉鎮前綴只留段名
+  const cleanSeg = s => s.replace(/.*[縣市區鄉鎮]/, '');
+
+  // 段 + 專有建號：標題列「○○段 09883-000建號」（全文第一個 5-3 建號＝專有）
+  let m = T.match(/([一-鿿]{1,3})段\s*(\d{5})-(\d{3})\s*建號/);
+  if(m){ out.landSeg = cleanSeg(m[1]); out.exclNo = m[2] + '-' + m[3]; }
+
+  // 建物門牌：懶抓到下一個標籤前（F3 門牌與坐落地號同行，需避免吃進「建物坐落地號」）
+  m = T.match(/建物門牌\s*[:：]\s*(.+?)(?=\s*(?:建物坐落|登記原因|主要用途)|\n|$)/);
+  if(m){
+    let h = m[1].replace(/\s+/g, '').trim();
+    // 門牌常缺縣市區，嘗試由文件開頭的「○縣/市○區」補上
+    if(!/[縣市]/.test(h.slice(0,3))){
+      const c = T.match(/[一-鿿]{2}[縣市][一-鿿]{1,3}[區鄉鎮市]/);
+      if(c) h = c[0] + h;
+    }
+    out.addr = h;
+  }
+
+  // 建物坐落地號：段（若門牌段沒抓到才用）+ 地號 4-4；值可能在同行或下一行
+  m = T.match(/建物坐落地號\s*[:：]\s*(?:[一-鿿]{1,3}段\s*)?(\d{4})-(\d{4})/);
+  if(!m) m = T.match(/建物坐落地號\s*[:：][\s\S]{0,40}?([一-鿿]{1,3})段\s*(\d{4})-(\d{4})/);
+  if(m){
+    if(m.length === 3){ out.landNo = m[1] + '-' + m[2]; }
+    else { if(m[1] && !out.landSeg) out.landSeg = cleanSeg(m[1]); out.landNo = m[2] + '-' + m[3]; }
+  }
+
+  // 層次（樓層）：層 次：十四層 → 14
+  m = T.match(/層\s*次\s*[:：]\s*([一-鿿\d]+?)層/);
+  if(m) out.mainFloor = cnFloor(m[1]);
+
+  // 主建物面積：以「層次面積」為準（單層住宅與總面積相同）
+  m = T.match(/層次面積\s*[:：]\s*([\d,]+\.\d+)/);
+  if(m) out.mainArea = m[1].replace(/,/g, '');
+
+  // 專有權利範圍：所有權部「（全部）N分之N」→ 1/1
+  m = T.match(/全部\s*(\d+)\s*分之\s*(\d+)/);
+  if(m) out.exclShare = m[2] + '/' + m[1];
+
+  // 附屬建物（陽台）：用途固定取陽台；面積取「附屬建物」段落內第一個平方公尺數
+  //  三家附屬面積標籤不同（面積／建物面積／無標籤），但都緊接在「附屬建物」之後，
+  //  且坪數標「坪」、面積標「平方公尺」，故取段落內第一個平方公尺數即為陽台面積。
+  //  附屬段落起點：取含「陽台」的「附屬建物」處（排除開頭「總面積+附屬建物+共有部分」摘要）
+  out.subs = [];
+  let aIdx = -1, re = /附屬建物/g, mm;
+  while((mm = re.exec(T))){ if(T.slice(mm.index, mm.index + 120).includes('陽台')){ aIdx = mm.index; break; } }
+  if(aIdx < 0){ const x = T.indexOf('陽台'); if(x >= 0) aIdx = Math.max(0, x - 20); }
+  if(aIdx >= 0){
+    let end = T.indexOf('共有部分', aIdx);
+    if(end < 0) end = Math.min(T.length, aIdx + 200);
+    const region = T.slice(aIdx, end);
+    // 用途與面積依出現順序配對（坪數標「坪」、登記面積標「平方公尺」，只取平方公尺數）
+    const uses = region.match(/陽台|雨遮|花台|平台|露台|遮陽板|屋簷/g) || [];
+    const areas = []; let ma2, reA = /([\d]+\.\d+)\s*平方公尺/g;
+    while((ma2 = reA.exec(region))) areas.push(ma2[1]);
+    const n = Math.max(uses.length, areas.length);
+    for(let k=0;k<n;k++) out.subs.push({ use: uses[k] || '', area: areas[k] || '' });
+  }
+  if(out.subs.length){ out.subUse = out.subs[0].use; out.subArea = out.subs[0].area; }  // 相容舊欄位
+
+  // 專有部分面積共計：電傳/謄本不直接列此欄，依公式＝主建物面積 ＋ 全部附屬建物面積（含雨遮等）
+  if(out.mainArea){
+    let a = parseFloat(out.mainArea);
+    out.subs.forEach(s => { if(s.area) a += parseFloat(s.area); });
+    if(!isNaN(a)) out.exclArea = round2(a);
+  }
+
+  // 共有部分（可多筆）：一棟常有公設、停車空間等多個共有建號，全部擷取。
+  //  範圍＝自「共有部分」到「建物所有權部」之間；持分面積＝直接給的「持分」優先，否則公式＝共有總面積×權利範圍。
+  out.commons = [];
+  const ci = T.indexOf('共有部分');
+  if(ci >= 0){
+    const oi = T.search(/建物所有權部|所有權人|他項權利部/);
+    const csec = T.slice(ci, (oi > ci ? oi : ci + 1800));
+    const reNo = /(\d{5})-(\d{3})\s*建號/g, idxs = []; let mn;
+    while((mn = reNo.exec(csec))) idxs.push({ no: mn[1] + '-' + mn[2], end: reNo.lastIndex, at: mn.index });
+    idxs.forEach((it, k) => {
+      const winEnd = k + 1 < idxs.length ? idxs[k+1].at : csec.length;
+      const win = csec.slice(it.end, Math.min(winEnd, it.end + 220));
+      const ms = win.match(/(\d{4,7})\s*分之\s*(\d{1,7})/);              // 權利範圍（持分比例）
+      const share = ms ? ms[1] + '分之' + ms[2] : '';
+      let area = '';
+      const mHold = win.match(/持分\s*([\d,]+\.\d+)\s*平方公尺/);          // 電傳常直接給持分面積
+      const mTot  = win.match(/([\d,]+\.\d+)\s*平方公尺/);                // 否則用共有總面積換算
+      if(mHold) area = mHold[1].replace(/,/g, '');
+      else if(ms && mTot){ const v = parseFloat(mTot[1].replace(/,/g,'')) * (+ms[2]) / (+ms[1]); if(!isNaN(v)) area = round2(v); }
+      out.commons.push({ no: it.no, share, area });
+    });
+  }
+
+  // 車位：電傳/謄本常把車位掛在共有部分。偵測到車位 → 標記有車位；本戶車位編號帶入。
+  //  編號可能英數混合（如 B2-828）；優先抓「含停車位」脈絡（本戶），避免誤抓全棟車位編號。
+  if(/含停車位|停車位編號|車位編號|車位\s*[\d.]+\s*坪/.test(T)){
+    out.hasPark = true;
+    const mPk = T.match(/含停車位\s*編號\s*[:：]?\s*([A-Za-z0-9-]+)/)        // 官方 inline「含停車位編號127」
+             || T.match(/含停車位[\s\S]{0,30}?編號\s*[:：]\s*([A-Za-z0-9-]+)/) // foundi「含停車位：…編號：B2-828」
+             || T.match(/車位\s*編號\s*[:：]?\s*([A-Za-z0-9-]+)/);            // 比房「車位編號:180」
+    if(mPk) out.parkNo = mPk[1].replace(/[-]+$/, '');
+  }
+
+  // 他項權利：「權利種類」僅出現在他項權利部，抓到即視為有（多為最高限額抵押權）
+  const mKind = T.match(/權利種類\s*[:：]\s*(最高限額抵押權|抵押權|地上權|不動產役權|典權|農育權|耕作權|普通抵押權|[一-鿿]{2,8}權)/);
+  if(mKind){ out.otherRight = '有'; out.otherRightKind = mKind[1].trim(); }
+
+  // 查封／假扣押／假處分／破產登記（標的有強制執行相關限制）
+  if(/查封|假扣押|假處分|破產登記/.test(T)) out.seizure = '有';
+
+  // 預告（限制）登記：標示部其他登記事項出現「限制登記/預告登記」→ 僅警示（合約無對應欄位）
+  if(/預告登記|限制登記/.test(T)) out.advanceReg = true;
+
+  return out;
+}
+// 四捨五入到小數兩位、回傳字串
+function round2(n){ return (Math.round(n * 100) / 100).toString(); }
+
+// 把解析結果帶入租賃標的欄位（橘底標示），回傳已帶入的欄位名陣列
+function applyDeed(d){
+  const filled = [];
+  const fill = (sel, v, label) => { if(v && ocrSet($(sel), v)){ filled.push(label); return true; } return false; };
+  fill('#addr', d.addr, '門牌');
+  fill('#landSeg', d.landSeg, '段');
+  fill('#landNo', d.landNo, '地號');
+  fill('#exclNo', d.exclNo, '專有建號');
+  fill('#exclShare', d.exclShare, '權利範圍');
+  fill('#exclArea', d.exclArea, '面積共計');
+  fill('#mainFloor', d.mainFloor, '主建物樓層');
+  fill('#mainArea', d.mainArea, '主建物面積');
+  // 附屬建物（可多筆：陽台／雨遮…）：重建列表，逐筆帶入並標橘底
+  if(d.subs && d.subs.length){
+    document.getElementById('subList').innerHTML = '';
+    subCount = 0;
+    d.subs.forEach(s => {
+      const row = addSubRow(s);
+      row.querySelectorAll('.s-use, .s-area').forEach(el => { if(el.value) el.classList.add('ocr-filled'); });
+    });
+    filled.push(`附屬建物 ${d.subs.length} 筆`);
+  }
+  // 共有部分（可多筆）：重建列表，逐筆帶入並標橘底
+  if(d.commons && d.commons.length){
+    document.getElementById('commonList').innerHTML = '';
+    commonCount = 0;
+    d.commons.forEach(c => {
+      const row = addCommonRow(c);
+      row.querySelectorAll('.c-no, .c-share, .c-area').forEach(el => { if(el.value) el.classList.add('ocr-filled'); });
+    });
+    filled.push(`共有部分 ${d.commons.length} 筆`);
+  }
+  // 車位：勾選「有」並帶入編號（若有）
+  if(d.hasPark){
+    const yes = document.querySelector('input[name="hasPark"][value="有"]');
+    if(yes && !yes.checked){ yes.checked = true; togglePark(); }
+    if(!val('carCnt')) ocrSet($('#carCnt'), '1');
+    let s = '車位';
+    if(d.parkNo && ocrSet($('#carSpotNo'), d.parkNo)) s = '車位（編號 ' + d.parkNo + '）';
+    filled.push(s);
+  }
+  // 他項權利：勾「有」並帶入權利種類（橘底）
+  if(d.otherRight === '有'){
+    const r = document.querySelector('input[name="otherRight"][value="有"]'); if(r) r.checked = true;
+    ocrSet($('#otherRightKind'), d.otherRightKind);
+    filled.push('他項權利（' + (d.otherRightKind || '有') + '）');
+  }
+  // 查封登記：偵測到才勾「有」
+  if(d.seizure === '有'){
+    const r = document.querySelector('input[name="seizure"][value="有"]'); if(r) r.checked = true;
+    filled.push('查封登記（有）');
+  }
+  return filled;
+}
+
+/* 上傳電傳／謄本：一次處理一份。PDF 先抽文字層，無文字層才退回影像 OCR；圖片走框選＋OCR。 */
+function scanDeed(ev){ const files = [...ev.target.files]; ev.target.value = ''; runDeedScan(files); }
+function deedDrop(e, el){
+  e.preventDefault(); el.classList.remove('drag');
+  const files = [...e.dataTransfer.files].filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name) || f.type.startsWith('image/'));
+  if(files.length) runDeedScan(files);
+}
+async function runDeedScan(files){
+  files = [...files].filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name) || f.type.startsWith('image/'));
+  if(!files.length) return;
+  const f  = files[0];                                   // 一次一份（謄本通常一份就夠）
+  const st = $('#ocrst_deed'), btn = $('#deedZone .ocr-btn');
+  btn?.classList.add('busy');
+  st.className = 'ocr-status';
+  try{
+    let text = '';
+    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if(isPdf){
+      st.textContent = '讀取 PDF…';
+      const r = await extractPdfText(f, p => { st.textContent = `讀取 PDF 文字… ${Math.round(p*100)}%`; });
+      if(r.charCount >= 30){
+        text = r.text;                                   // 電子謄本：有文字層，直接用
+      } else {
+        st.textContent = '此 PDF 無文字層（掃描檔），改用影像辨識…（首次需下載中文模型）';
+        text = await ocrPdfPages(f, p => { st.textContent = `辨識中… ${Math.round(p*100)}%`; });
+      }
+    } else {
+      st.textContent = '請在跳出的視窗框選謄本範圍…';
+      const crop = await cropImage(f);                   // 截圖／拍照：框選
+      if(!crop){ st.textContent = '已取消框選'; return; }
+      st.textContent = '辨識中…（首次需下載中文模型）';
+      text = await ocrImage(processForOcr(crop), p => { st.textContent = `辨識中… ${Math.round(p*100)}%`; });
+    }
+    const d = parseDeed(text);
+    const filled = applyDeed(d);
+    showOcrRaw('ocrraw_deed', text);
+    // 預告/限制登記無對應欄位，僅警示提醒人工查證
+    const warn = d.advanceReg ? '　⚠ 偵測到預告／限制登記，合約無此欄位，請人工查證！' : '';
+    if(filled.length){
+      st.className = d.advanceReg ? 'ocr-status err' : 'ocr-status';
+      st.textContent = `已帶入：${filled.join('、')}（草稿，請務必核對）` + warn;
+    } else {
+      st.className = 'ocr-status err';
+      st.textContent = '未能自動辨識欄位，請展開下方原文手動填入' + warn;
+    }
+  } catch(e){
+    st.className = 'ocr-status err';
+    st.textContent = '處理失敗：' + e.message;
+  } finally {
+    btn?.classList.remove('busy');
+  }
+}
+
 /* ---- 動作 ---- */
 function generate(){
   $('#contractDoc').innerHTML = applyHangingIndent(buildContract());
@@ -1567,6 +1971,8 @@ function toast(msg){
 
 /* ---- 初始化 ---- */
 buildUI();
+addSubRow();             // 附屬建物先放一列空白（可按「＋新增」或由謄本辨識多筆覆蓋）
+addCommonRow();          // 共有部分先放一列空白（可按「＋新增」或由謄本辨識多筆覆蓋）
 togglePark();
 togglePay();
 toggleConf();
