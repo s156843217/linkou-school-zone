@@ -79,6 +79,20 @@
     background:#fff;cursor:pointer;color:var(--ink-soft);transition:.15s;font-family:var(--sans)}
   .zt:hover{border-color:var(--clay)}
   .zt.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  /* 地圖工具列：選學校看學區範圍的下拉（沿用膠囊外觀） */
+  .zt-pick{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:999px;border:1.5px solid var(--line);
+    background:#fff;cursor:pointer;color:var(--ink);font-family:var(--sans)}
+  .zt-pick:hover{border-color:var(--clay)}
+  .zt-pick.on{border-color:var(--clay);color:var(--clay-d)}
+  /* 學校學區卡：社區清單 */
+  .zc-meta{font-size:13px;color:var(--ink-soft);margin-bottom:4px}
+  .zc-hint{font-size:12.5px;color:var(--ink-soft);margin:8px 0}
+  .zc-list{display:flex;flex-wrap:wrap;gap:6px;max-height:300px;overflow:auto}
+  .zc-comm{font-size:12.5px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 10px;
+    cursor:pointer;text-align:left;font-family:var(--sans);color:var(--ink);transition:.15s}
+  .zc-comm:hover{border-color:var(--clay);background:var(--bg)}
+  .zc-comm .zc-sub{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
+  .zc-empty{color:var(--ink-soft);font-size:13px;padding:6px 0}
 
   .results{display:flex;flex-direction:column;gap:14px}
   .placeholder{padding:38px 22px;text-align:center;color:var(--ink-soft)}
@@ -291,6 +305,9 @@
         <button class="zt on" data-zone="es">國小學區</button>
         <button class="zt" data-zone="jh">國中學區</button>
         <button class="zt" data-zone="li">里界</button>
+        <select class="zt-pick" id="schoolPick" title="選一所學校，直接在地圖看它的學區範圍">
+          <option value="">🏫 看某校學區…</option>
+        </select>
       </div>
       <div id="map"></div>
     </div>
@@ -504,6 +521,90 @@ function resolve(li,lin){
   return {es:pick(d.es), jh:pick(d.jh), hasSplit:(d.es.length>1||d.jh.length>1)};
 }
 
+/* 反查：某社區（里＋鄰）對某校（zone es/jh）的關係 — 'base' 主學區 / 'free' 自由可選 / null 不屬於。
+ * 重用 inRange，故與正向查詢的鄰判斷完全一致（精準到鄰）。 */
+function communityForSchool(li,lin,school,zone){
+  const d=LI[li]; if(!d)return null;
+  const n=(lin==null||lin==="")?null:parseInt(lin,10);
+  for(const rl of d[zone]){
+    if(!inRange(n,rl))continue;
+    if(rl.base===school)return 'base';
+    if(rl.free&&rl.free.includes(school))return 'free';
+  }
+  return null;
+}
+
+/* 學校學區卡：列出該校學區內的社區（主學區一組、可自由選填的另一組），寫入右側結果區。 */
+function renderSchoolZone(school,zone,skipped){
+  const info=SCHOOLS[school]||{};
+  const base=[],free=[];
+  for(const name in COMMUNITY){
+    const c=COMMUNITY[name];
+    const rel=communityForSchool(c.li,c.lin,school,zone);
+    if(rel==='base')base.push([name,c]);
+    else if(rel==='free')free.push([name,c]);
+  }
+  const liList=[...new Set(base.map(x=>x[1].li))];
+  const isFull=zone==='es'&&FULL_ES.includes(school);
+  const isCityFree=zone==='es'&&CITY_FREE_ES.includes(school);
+  const dotColor=zone==='es'?'var(--clay)':'var(--teal)';
+  const item=([name,c])=>`<button class="zc-comm" data-comm="${name.replace(/"/g,'&quot;')}">${name}<span class="zc-sub">${c.li}${c.lin?` ${c.lin}鄰`:''}</span></button>`;
+  let html=`<div class="panel rcard">
+      <h3><span class="dot" style="background:${dotColor}"></span>${school} · ${zone==='es'?'國小':'國中'}學區範圍</h3>
+      <div class="zc-meta">${info.addr?`📍 ${info.addr}`:''}${info.tel?`　☎ ${info.tel}`:''}</div>`;
+  if(isFull)html+=`<div class="disc" style="margin:8px 0">⚠️ <b>額滿學校</b>：須父母與學童共同設籍＋居住事實，超額依設籍先後排序，越早設籍越有利。</div>`;
+  else if(isCityFree)html+=`<div class="disc" style="margin:8px 0">✅ <b>全市自由學區</b>：設籍後通常可順利入學，額滿時抽籤。</div>`;
+  html+=`<div class="zc-hint">主學區涵蓋 <b>${liList.length}</b> 個里、<b>${base.length}</b> 筆社區（點社區可定位查詳細學區）。地圖<b>實線</b>為整里屬本校、<b>虛線</b>為里內部分鄰屬本校（概略範圍，以里為單位）。</div>`;
+  if(skipped&&skipped.length)html+=`<div class="disc" style="margin:8px 0">ℹ️ <b>${skipped.join('、')}</b> 的里界圖資有誤，暫未顯示於地圖（社區清單與學區判定仍正確，圖資待以官方資料修復）。</div>`;
+  html+=`<div class="zc-list">${base.length?base.map(item).join(''):'<div class="zc-empty">此範圍查無建檔社區</div>'}</div>`;
+  if(free.length)html+=`<details class="acc panel" style="margin-top:10px"><summary>另有 ${free.length} 筆社區可「自由選填」本校 <span class="chev">▾</span></summary><div class="body"><div class="zc-list">${free.map(item).join('')}</div></div></details>`;
+  html+=`</div>`;
+  $("#results").innerHTML=html;
+  $("#copybar").style.display="none";   // 學校範圍模式：不顯示「複製查詢摘要」
+}
+
+/* 反查某校「確定學區(base)」涵蓋的里：full＝整里屬該校、partial＝里內僅部分鄰屬該校。
+ * 只取 base、不含自由學區(free)——free 只是「可選填」之一，畫進地圖會讓人誤會整片都是該校學區。 */
+function liSetForSchool(school,zone){
+  const full=new Set(), partial=new Set();
+  for(const li in LI){
+    for(const rl of (LI[li][zone]||[])){
+      if(rl.base!==school) continue;                          // 只畫確定學區（base）
+      if(rl.r==="all") full.add(li); else partial.add(li);   // "all"＝整里、其餘（鄰範圍/else）＝部分鄰
+    }
+  }
+  full.forEach(li=>partial.delete(li));   // 同里若有整里規則，以 full 為準
+  return {full:[...full], partial:[...partial]};
+}
+
+/* 里界圖資是否落在林口合理範圍（經度<121.45）。仁愛/太平/東勢里的 LK_GEO 含離群座標，
+ * 會讓地圖暴衝到坪林/汐止；繪製前先檢查，異常者略過，待日後以官方村里界圖資修復。 */
+function liGeoUsable(f){
+  let ok=true;
+  (function scan(cs){ for(const c of cs){ if(!ok)return; Array.isArray(c[0])?scan(c):(c[0]>121.45&&(ok=false)); } })(f.geometry.coordinates);
+  return ok;
+}
+
+/* 在地圖高亮某校確定學區範圍：整里實線、部分鄰里虛線；界線異常的里自動略過並回傳清單。 */
+function drawSchoolZoneByLi(school,zone){
+  if(liLayer){map.removeLayer(liLayer);liLayer=null;}
+  const {full,partial}=liSetForSchool(school,zone);
+  const color=zone==='es'?'#BD5E39':'#3C7A62';
+  const group=L.featureGroup(), skipped=[];
+  const add=(arr,opts)=>arr.forEach(li=>{
+    const f=LK_GEO.features.find(x=>x.properties.li===li);
+    if(!f) return;
+    if(!liGeoUsable(f)){ skipped.push(li); return; }   // 略過界線異常的里，避免地圖跑掉
+    L.geoJSON(f,{style:Object.assign({color,weight:2,fillColor:color},opts)})
+      .bindTooltip(li,{direction:'center',className:'zone-tip'}).addTo(group);
+  });
+  add(full,{fillOpacity:.18,dashArray:null});
+  add(partial,{fillOpacity:.06,dashArray:'5,4'});
+  group.addTo(map); liLayer=group;
+  try{ if(group.getLayers().length) map.fitBounds(group.getBounds(),{padding:[40,40],maxZoom:15}); }catch(e){}
+  return skipped;
+}
+
 /* ============================ 地圖 ============================ */
 function initMap(){
   map=L.map('map',{scrollWheelZoom:false}).setView([25.0772,121.3645],13);
@@ -613,6 +714,7 @@ const SETJI_HTML=`
   </div>`;
 
 function render(li,lin,homeLatLng){
+  const sp=$("#schoolPick"); if(sp){sp.value="";sp.classList.remove('on');}   // 一般查詢→重置「看某校學區」下拉
   const res=resolve(li,lin);
   if(!res){toast("查無此里資料");return;}
   lastResult={li,lin,res};
@@ -793,6 +895,38 @@ document.querySelectorAll('.zt').forEach(b=>b.addEventListener('click',()=>{
   if(mapZone==='jh'&&!zoneCtx.jh&&zoneCtx.li) toast("此結果非單一國中學區（自由學區或未指定鄰），已顯示里界");
 }));
 
+/* 地圖工具列「看某校學區」下拉：生成選項、切換時高亮該校學區範圍並列出社區。 */
+function buildSchoolPicker(){
+  const sel=$("#schoolPick"); if(!sel)return;
+  const grp=(label,zone,fc)=>{
+    if(typeof fc==='undefined')return"";
+    const opts=fc.features.map(f=>`<option value="${zone}|${f.properties.school}">${f.properties.school}</option>`).join("");
+    return `<optgroup label="${label}">${opts}</optgroup>`;
+  };
+  sel.insertAdjacentHTML('beforeend',
+    grp('國小','es',typeof SCHOOL_GEO_ES!=='undefined'?SCHOOL_GEO_ES:undefined)+
+    grp('國中','jh',typeof SCHOOL_GEO_JH!=='undefined'?SCHOOL_GEO_JH:undefined));
+  sel.addEventListener('change',()=>{
+    const v=sel.value;
+    sel.classList.toggle('on',!!v);
+    if(!v){   // 回到查詢模式：清掉學校高亮與卡片
+      if(liLayer){map.removeLayer(liLayer);liLayer=null;}
+      $("#results").innerHTML=`<div class="panel placeholder"><div class="big">🏫 還沒有查詢結果</div>輸入地址或選擇里別後，這裡會顯示對應的<br>國小、國中學區與設籍提醒。</div>`;
+      $("#copybar").style.display="none";
+      return;
+    }
+    const [zone,school]=v.split('|');
+    document.querySelectorAll('.zt').forEach(x=>x.classList.toggle('on',x.dataset.zone===zone));
+    const skipped=drawSchoolZoneByLi(school,zone);   // 用里界組合，並回傳界線異常被略過的里
+    renderSchoolZone(school,zone,skipped);
+  });
+  // 點社區卡片 → 帶入既有社區查詢流程定位（render 會自動把下拉重置回查詢模式）
+  $("#results").addEventListener('click',e=>{
+    const el=e.target.closest('.zc-comm'); if(!el)return;
+    $("#commInput").value=el.dataset.comm; $("#commBtn").click();
+  });
+}
+
 /* ============================ 社區搜尋（autocomplete） ============================ */
 const COMM_NAMES=Object.keys(COMMUNITY);
 
@@ -963,7 +1097,7 @@ $("#commBtn").addEventListener('click',()=>{
 
 /* init */
 LI_NAMES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;$("#liSelect").appendChild(o);});
-initMap(); renderKg(); renderSchoolList();
+initMap(); renderKg(); renderSchoolList(); buildSchoolPicker();
 $("#addrInput").addEventListener('keydown',e=>{if(e.key==="Enter")$("#addrBtn").click();});
 </script>
 </body>
