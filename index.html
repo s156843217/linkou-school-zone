@@ -292,8 +292,8 @@
         <button class="zt on" data-zone="es">國小學區</button>
         <button class="zt" data-zone="jh">國中學區</button>
         <button class="zt" data-zone="li">里界</button>
-        <select class="zt-pick" id="schoolPick" title="選一所學校，直接在地圖看它的學區範圍">
-          <option value="">🏫 看某校學區…</option>
+        <select class="zt-pick" id="schoolPick" title="先選上方「國小學區／國中學區」，再從這裡挑學校看範圍">
+          <option value="">🏫 選學校看範圍…</option>
         </select>
       </div>
       <div id="map"></div>
@@ -886,37 +886,41 @@ document.querySelectorAll('.zt').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.zt').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');
   mapZone=b.dataset.zone;
+  fillSchoolOptions(mapZone);   // 切國小／國中時，下方下拉內容跟著換（里界則隱藏）
   drawZone(true);
   if(mapZone==='es'&&!zoneCtx.es&&zoneCtx.li) toast("此結果非單一國小學區（自由學區或未指定鄰），已顯示里界");
   if(mapZone==='jh'&&!zoneCtx.jh&&zoneCtx.li) toast("此結果非單一國中學區（自由學區或未指定鄰），已顯示里界");
 }));
 
 /* 地圖工具列「看某校學區」下拉：生成選項、切換時高亮該校學區範圍並列出社區。 */
+/* 依目前 mapZone（國小 es／國中 jh）填入下拉的學校選項；里界模式則隱藏下拉。 */
+function fillSchoolOptions(zone){
+  const sel=$("#schoolPick"); if(!sel)return;
+  if(zone!=='es'&&zone!=='jh'){ sel.style.display='none'; return; }   // 里界：不需選校
+  sel.style.display='';
+  const fc = zone==='es' ? (typeof SCHOOL_GEO_ES!=='undefined'?SCHOOL_GEO_ES:null)
+                         : (typeof SCHOOL_GEO_JH!=='undefined'?SCHOOL_GEO_JH:null);
+  const ph = zone==='es' ? '🏫 選國小看範圍…' : '🏫 選國中看範圍…';
+  sel.innerHTML = `<option value="">${ph}</option>` +
+    (fc ? fc.features.map(f=>`<option value="${f.properties.school}">${f.properties.school}</option>`).join('') : '');
+  sel.classList.remove('on');
+}
+
 function buildSchoolPicker(){
   const sel=$("#schoolPick"); if(!sel)return;
-  const grp=(label,zone,fc)=>{
-    if(typeof fc==='undefined')return"";
-    const opts=fc.features.map(f=>`<option value="${zone}|${f.properties.school}">${f.properties.school}</option>`).join("");
-    return `<optgroup label="${label}">${opts}</optgroup>`;
-  };
-  sel.insertAdjacentHTML('beforeend',
-    grp('國小','es',typeof SCHOOL_GEO_ES!=='undefined'?SCHOOL_GEO_ES:undefined)+
-    grp('國中','jh',typeof SCHOOL_GEO_JH!=='undefined'?SCHOOL_GEO_JH:undefined));
+  fillSchoolOptions(mapZone);   // 依目前選的國小／國中（預設國小）填入
   sel.addEventListener('change',()=>{
-    const v=sel.value;
-    sel.classList.toggle('on',!!v);
-    if(!v){   // 回到查詢模式：清掉學校高亮與卡片
+    const school=sel.value;
+    sel.classList.toggle('on',!!school);
+    if(!school){   // 清空→回查詢模式
       if(liLayer){map.removeLayer(liLayer);liLayer=null;}
       $("#results").innerHTML=`<div class="panel placeholder"><div class="big">🏫 還沒有查詢結果</div>輸入地址或選擇里別後，這裡會顯示對應的<br>國小、國中學區與設籍提醒。</div>`;
-      $("#copybar").style.display="none";
-      return;
+      $("#copybar").style.display="none"; return;
     }
-    const [zone,school]=v.split('|');
-    document.querySelectorAll('.zt').forEach(x=>x.classList.toggle('on',x.dataset.zone===zone));
-    const skipped=drawSchoolZoneByLi(school,zone);   // 用里界組合，並回傳界線異常被略過的里
-    renderSchoolZone(school,zone,skipped);
+    const zone = mapZone==='jh' ? 'jh' : 'es';   // 看國小或國中由上方鈕決定
+    renderSchoolZone(school,zone,drawSchoolZoneByLi(school,zone));
   });
-  // 點社區卡片 → 帶入既有社區查詢流程定位（render 會自動把下拉重置回查詢模式）
+  // 點社區卡片 → 帶入既有社區查詢流程定位（render 會自動重置下拉）
   $("#results").addEventListener('click',e=>{
     const el=e.target.closest('.zc-comm'); if(!el)return;
     $("#commInput").value=el.dataset.comm; $("#commBtn").click();
