@@ -101,6 +101,28 @@
   .photo-thumb .rm{position:absolute;top:5px;right:5px;width:22px;height:22px;border:none;border-radius:50%;
     background:rgba(0,0,0,.55);color:#fff;font-size:15px;line-height:22px;text-align:center;cursor:pointer;padding:0}
   .photo-thumb .rm:hover{background:rgba(0,0,0,.8)}
+  /* 縮圖左上：單張旋轉鈕（與右上的移除鈕對稱） */
+  .photo-thumb .rot{position:absolute;top:5px;left:5px;width:22px;height:22px;border:none;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:22px;text-align:center;cursor:pointer;padding:0}
+  .photo-thumb .rot:hover{background:rgba(0,0,0,.8)}
+  /* 縮圖左下：目前順序序號（拖曳排序後即時更新） */
+  .photo-thumb .ord{position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;
+    line-height:1;padding:2px 6px;border-radius:8px;pointer-events:none}
+  /* 可拖曳排序：游標提示 + 拖曳中半透明 */
+  .photo-thumb{cursor:grab}
+  .photo-thumb.dragging{opacity:.4;cursor:grabbing}
+  /* 縮圖右下：左右移動鈕（手機點按調整順序，桌機亦可用） */
+  .photo-thumb .mv{position:absolute;bottom:5px;right:5px;display:flex;gap:4px}
+  .photo-thumb .mv button{width:26px;height:26px;border:none;border-radius:7px;background:rgba(0,0,0,.55);
+    color:#fff;font-size:16px;line-height:26px;text-align:center;cursor:pointer;padding:0}
+  .photo-thumb .mv button:hover{background:rgba(0,0,0,.8)}
+  .photo-thumb .mv button:disabled{opacity:.3;cursor:default}
+
+  /* 附件分類小區塊（現場照片／證件／存摺／鑰匙／其他） */
+  .attach-group{padding:14px 0;border-top:1px dashed var(--line)}
+  .attach-group:first-child{border-top:none;padding-top:2px}
+  .attach-group .attach-head{font-weight:700;color:var(--ink);margin-bottom:2px;font-size:14.5px}
+  .attach-group .attach-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:9px}
 
   /* 特約事項範本勾選 */
   .term-item{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);
@@ -155,7 +177,13 @@
   /* 第 12 項附屬設備：雙欄無框內表 */
   .contract-doc table.eq-inner{width:100%;border-collapse:collapse;margin-top:4px}
   .contract-doc table.eq-inner td{border:none;padding:2px 6px;font-size:13.5px;width:50%;vertical-align:top}
-  .contract-doc .pgbreak{page-break-before:always}
+  .contract-doc .pgbreak{page-break-before:always;break-before:page}
+  /* 螢幕預覽：標出分頁位置（列印 / 存 PDF 時不顯示這條虛線，實際會另起一頁）。 */
+  @media screen{
+    .contract-doc .pgbreak{margin:30px 0 4px;border-top:2px dashed #d8c7a8;position:relative}
+    .contract-doc .pgbreak::after{content:"以下另起一頁";position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+      background:#fff;padding:0 12px;font-size:11px;color:#b08a5a;letter-spacing:2px}
+  }
   .contract-doc .eq-out{column-count:2;column-gap:30px;font-size:14px}
   .contract-doc .attach-title{text-align:center;font-size:18px;font-weight:900;letter-spacing:2px;margin:6px 0 12px}
   /* 附件二 現場照片：雙欄 */
@@ -577,16 +605,12 @@
       </div></div>
     </section>
 
-    <!-- 8.5 現場照片（附件二） -->
+    <!-- 8.5 附件影像（現場照片／證件／存摺／鑰匙／其他）→ 依序附在合約最後 -->
     <section class="panel form-panel">
-      <div class="module-title"><span class="dot"></span>現場照片（附件二）</div>
-      <div class="module-desc">可一次批次選取多張現場照片，將附在合約最後（附件二）。影像僅在本機處理、不會上傳。</div>
-      <label class="btn ghost" style="cursor:pointer;display:inline-block">
-        ＋ 選擇照片（可多選）
-        <input type="file" id="photoInput" accept="image/*" multiple onchange="addPhotos(event)" style="display:none">
-      </label>
-      <span class="hint" id="photoHint" style="margin-left:10px">尚未選取照片</span>
-      <div class="photo-grid" id="photoGrid"></div>
+      <div class="module-title"><span class="dot"></span>附件影像（附於合約最後）</div>
+      <div class="module-desc">以下各類附件可批次上傳多張，產生合約時會依序附在最後（附件二、三、四…）。所有影像僅在本機處理、<strong>不會上傳任何伺服器</strong>；證件、存摺等敏感資料請斟酌使用。</div>
+      <!-- 各分類上傳區由 renderAttachUI() 依 ATTACH_GROUPS 設定生成 -->
+      <div id="attachGroups"></div>
     </section>
 
     <!-- 9. 簽約日期 -->
@@ -633,6 +657,7 @@
     <div class="ocr-crop-sel" id="ocrCropSel"></div>
   </div>
   <div class="ocr-crop-actions">
+    <button class="btn ghost" id="ocrCropRotate">↻ 旋轉 90°</button>
     <button class="btn" id="ocrCropOk">辨識框選範圍</button>
     <button class="btn ghost" id="ocrCropFull">整張辨識</button>
     <button class="btn ghost" id="ocrCropCancel">取消這張</button>
@@ -1082,8 +1107,9 @@ function buildContract(){
   // ===== 附件一 現況確認書（含第 12 項附屬設備）=====
   P.push(buildConfirm());
 
-  // ===== 附件二 現場照片（有上傳才輸出）=====
-  if(PHOTOS.length) P.push(buildPhotos());
+  // ===== 附件二以後 影像附件（現場照片／證件／存摺／鑰匙／其他，有上傳才輸出）=====
+  const att = buildAttachments();
+  if(att) P.push(att);
 
   return P.join('\n');
 }
@@ -1232,13 +1258,40 @@ function eqCellHTML(){
   return h;
 }
 
-/* ---- 現場照片（附件二）----
+/* ---- 附件影像（現場照片／證件／存摺／鑰匙／其他）----
  * 純前端：上傳後在本機以 canvas 縮圖、轉 JPEG（控制檔案大小、利於 Word 內嵌），
- * 以 base64 data URI 存於記憶體陣列，不上傳任何伺服器。
+ * 以 base64 data URI 存於記憶體，不上傳任何伺服器。
+ * 各分類共用同一套上傳／縮圖牆／輸出邏輯，僅以 key 區分。
  * caption 欄位先保留（目前不填），日後要在每張下加簡短說明可直接沿用。     */
-let PHOTOS = [];   // {data: dataURL, caption: ''}
+const ATTACH_GROUPS = [
+  { key:'photo',    title:'現場照片（室內、外觀現況）', desc:'物件室內、外觀等現況照片。' },
+  { key:'idcard',   title:'雙方身分證明文件影本',       desc:'出租人與承租人身分證／證件影本。' },
+  { key:'passbook', title:'出租人存摺帳戶封面',         desc:'供承租人匯款租金核對帳號用。' },
+  { key:'key',      title:'交付鑰匙照片',               desc:'交付承租人的鑰匙、門禁感應扣等。' },
+  { key:'other',    title:'其他文件',                   desc:'其他附件，可於下方自訂附件說明。', custom:true },
+];
+// 各分類的影像陣列：{ photo:[{data,caption}], idcard:[...], ... }
+const ATTACH = {};
+ATTACH_GROUPS.forEach(g => ATTACH[g.key] = []);
 
-function addPhotos(ev){
+/* 依設定生成各分類上傳區（頁面載入時呼叫一次） */
+function renderAttachUI(){
+  $('#attachGroups').innerHTML = ATTACH_GROUPS.map(g=>`
+    <div class="attach-group">
+      <div class="attach-head">${g.title}　<span class="hint" id="hint_${g.key}">尚未選取</span></div>
+      <div class="attach-sub">${g.desc}</div>
+      ${g.custom ? `<div class="row" style="margin-bottom:9px"><div class="field lg">
+        <input id="attachTitle_other" type="text" placeholder="附件說明（例：鑰匙清點單、車位租賃同意書）"></div></div>` : ''}
+      <label class="btn ghost sm" style="cursor:pointer;display:inline-block">
+        ＋ 選擇照片（可多選）
+        <input type="file" accept="image/*" multiple onchange="addAttach('${g.key}', event)" style="display:none">
+      </label>
+      <div class="photo-grid" id="grid_${g.key}"></div>
+    </div>`).join('');
+}
+
+/* 上傳：縮至最長邊 1000px、轉 JPEG 後存入該分類陣列 */
+function addAttach(key, ev){
   const files = [...ev.target.files];
   ev.target.value = '';   // 清空，允許之後再選同一檔
   files.forEach(file=>{
@@ -1247,15 +1300,14 @@ function addPhotos(ev){
     reader.onload = e=>{
       const img = new Image();
       img.onload = ()=>{
-        // 縮至最長邊 1000px
         const max = 1000;
         let w = img.width, h = img.height;
         if(w>max || h>max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
         cv.getContext('2d').drawImage(img, 0, 0, w, h);
-        PHOTOS.push({ data: cv.toDataURL('image/jpeg', 0.82), caption: '' });
-        renderPhotos();
+        ATTACH[key].push({ data: cv.toDataURL('image/jpeg', 0.82), caption: '' });
+        renderAttach(key);
       };
       img.src = e.target.result;
     };
@@ -1263,26 +1315,96 @@ function addPhotos(ev){
   });
 }
 
-function renderPhotos(){
-  $('#photoGrid').innerHTML = PHOTOS.map((p,i)=>`
-    <div class="photo-thumb">
-      <button class="rm" onclick="removePhoto(${i})" title="移除">×</button>
-      <img src="${p.data}" alt="現場照片 ${i+1}">
+function renderAttach(key){
+  const list = ATTACH[key];
+  // 每張縮圖：左上旋轉、右上移除、左下序號；整張可拖曳調整順序（draggable）
+  $('#grid_'+key).innerHTML = list.map((p,i)=>`
+    <div class="photo-thumb" draggable="true"
+         ondragstart="attachDragStart('${key}',${i},event)" ondragover="attachDragOver(event)"
+         ondrop="attachDrop('${key}',${i},event)" ondragend="attachDragEnd(event)">
+      <button class="rot" onclick="rotateAttach('${key}',${i})" title="旋轉 90°">↻</button>
+      <button class="rm" onclick="removeAttach('${key}',${i})" title="移除">×</button>
+      <img src="${p.data}" alt="附件 ${i+1}" draggable="false">
+      <span class="ord">${i+1}</span>
+      <span class="mv">
+        <button onclick="moveAttach('${key}',${i},-1)" title="往前" ${i===0?'disabled':''}>‹</button>
+        <button onclick="moveAttach('${key}',${i},1)" title="往後" ${i===list.length-1?'disabled':''}>›</button>
+      </span>
     </div>`).join('');
-  $('#photoHint').textContent = PHOTOS.length ? `已選取 ${PHOTOS.length} 張照片` : '尚未選取照片';
+  $('#hint_'+key).textContent = list.length ? `已選取 ${list.length} 張（可拖曳或用 ‹ › 調整順序）` : '尚未選取';
 }
 
-function removePhoto(i){ PHOTOS.splice(i,1); renderPhotos(); }
+/* 左右移動：與相鄰那張對調順序（手機友善；dir = -1 往前、+1 往後） */
+function moveAttach(key, i, dir){
+  const list = ATTACH[key];
+  const j = i + dir;
+  if(j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  renderAttach(key);
+}
 
-/* ---- 附件二 現場照片（輸出，雙欄網格；caption 有值才顯示）---- */
-function buildPhotos(){
-  let h = `<div class="pgbreak"></div><p class="attach-title">附件二　現場照片</p>`;
-  h += `<table class="photo-out"><tr>`;
-  PHOTOS.forEach((p,i)=>{
-    h += `<td><img src="${p.data}">${p.caption?`<div class="photo-cap">${esc(p.caption)}</div>`:''}</td>`;
-    if(i%2===1) h += `</tr><tr>`;   // 每兩張換列
+function removeAttach(key, i){ ATTACH[key].splice(i,1); renderAttach(key); }
+
+/* 單張旋轉：把該張影像順時針旋轉 90°（直式照片可轉正），回存後重畫 */
+function rotateAttach(key, i){
+  const p = ATTACH[key][i];
+  const img = new Image();
+  img.onload = ()=>{
+    const cv = document.createElement('canvas');
+    cv.width = img.height; cv.height = img.width;               // 寬高對調
+    const ctx = cv.getContext('2d');
+    ctx.translate(img.height, 0); ctx.rotate(Math.PI/2);       // 順時針 90°
+    ctx.drawImage(img, 0, 0);
+    p.data = cv.toDataURL('image/jpeg', 0.85);
+    renderAttach(key);
+  };
+  img.src = p.data;
+}
+
+/* 拖曳排序（同一分類內互換順序）。桌機原生拖放；only 同 key 才接受。 */
+let attachDrag = null;   // { key, from }
+function attachDragStart(key, i, e){
+  attachDrag = { key, from: i };
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+function attachDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function attachDrop(key, i, e){
+  e.preventDefault();
+  if(!attachDrag || attachDrag.key !== key || attachDrag.from === i) return;
+  const list = ATTACH[key];
+  const [moved] = list.splice(attachDrag.from, 1);   // 取出被拖的那張
+  list.splice(i, 0, moved);                          // 插到放開的位置
+  attachDrag = null;
+  renderAttach(key);
+}
+function attachDragEnd(e){ e.currentTarget.classList.remove('dragging'); attachDrag = null; }
+
+/* ---- 附件影像（輸出，雙欄網格）----
+ * 各分類有上傳才輸出；附件編號從「二」起連續遞增（附件一為現況確認書）。
+ * 其他文件以使用者自訂的附件說明為標題（未填則用預設「其他文件」）。      */
+function buildAttachments(){
+  const CN = ['一','二','三','四','五','六','七','八','九','十'];
+  let n = 1;            // 索引 1 對應「附件二」（附件一已給現況確認書）
+  let h = '';
+  ATTACH_GROUPS.forEach(g=>{
+    const list = ATTACH[g.key];
+    if(!list.length) return;
+    n++;
+    // 其他文件：優先用自訂說明當標題
+    let title = g.title;
+    if(g.custom){
+      const t = (val('attachTitle_other')||'').trim();
+      if(t) title = t;
+    }
+    h += `<div class="pgbreak"></div><p class="attach-title">附件${CN[n-1]}　${esc(title)}</p>`;
+    h += `<table class="photo-out"><tr>`;
+    list.forEach((p,i)=>{
+      h += `<td><img src="${p.data}">${p.caption?`<div class="photo-cap">${esc(p.caption)}</div>`:''}</td>`;
+      if(i%2===1) h += `</tr><tr>`;   // 每兩張換列
+    });
+    h += `</tr></table>`;
   });
-  h += `</tr></table>`;
   return h;
 }
 
@@ -1402,17 +1524,38 @@ function cropImage(file){
   return new Promise(resolve => {
     loadImageFile(file).then(img => {
       const modal = $('#ocrCrop'), stage = $('#ocrCropStage'), elImg = $('#ocrCropImg'), sel = $('#ocrCropSel');
-      const natW = img.naturalWidth, natH = img.naturalHeight;
-      // 顯示尺寸：塞進螢幕（最寬 900 / 視窗 92%，最高 60% 視窗）
-      const ds = Math.min(Math.min(window.innerWidth*0.92, 900)/natW, window.innerHeight*0.6/natH, 1);
-      const dispW = Math.round(natW*ds), dispH = Math.round(natH*ds);
-      elImg.src = img.src; elImg.width = dispW; elImg.height = dispH;
-      stage.style.width = dispW+'px'; stage.style.height = dispH+'px';
-      // 預設框：內縮 6%（使用者可直接微調或重畫）
-      let box = { x: dispW*0.06, y: dispH*0.06, w: dispW*0.88, h: dispH*0.88 };
+      // src＝目前的顯示／裁切來源；旋轉後會換成旋轉後的 canvas（img 與 canvas 都可當 drawImage 來源）。
+      let src = img;
+      let ds, dispW, dispH, box;
+      const dimW = () => src.naturalWidth || src.width;        // img 用 naturalWidth、canvas 用 width
+      const dimH = () => src.naturalHeight || src.height;
       const drawSel = () => { sel.style.left=box.x+'px'; sel.style.top=box.y+'px'; sel.style.width=box.w+'px'; sel.style.height=box.h+'px'; };
-      drawSel();
+      // 依目前 src 重算顯示尺寸、套圖、重置預設框（內縮 6%）。旋轉後也呼叫這個。
+      const applySrc = () => {
+        const natW = dimW(), natH = dimH();
+        // 顯示尺寸：塞進螢幕（最寬 900 / 視窗 92%，最高 60% 視窗）
+        ds = Math.min(Math.min(window.innerWidth*0.92, 900)/natW, window.innerHeight*0.6/natH, 1);
+        dispW = Math.round(natW*ds); dispH = Math.round(natH*ds);
+        elImg.src = src.toDataURL ? src.toDataURL('image/jpeg', 0.92) : src.src;
+        elImg.width = dispW; elImg.height = dispH;
+        stage.style.width = dispW+'px'; stage.style.height = dispH+'px';
+        box = { x: dispW*0.06, y: dispH*0.06, w: dispW*0.88, h: dispH*0.88 };
+        drawSel();
+      };
+      applySrc();
       modal.classList.add('show');
+
+      // 順時針旋轉 90°：把目前 src 畫到寬高對調的 canvas，成為新的裁切來源（直式照片可轉正）
+      const rotate = () => {
+        const sw = dimW(), sh = dimH();
+        const cv = document.createElement('canvas');
+        cv.width = sh; cv.height = sw;                          // 寬高對調
+        const ctx = cv.getContext('2d');
+        ctx.translate(sh, 0); ctx.rotate(Math.PI/2);           // 順時針 90°
+        ctx.drawImage(src, 0, 0);
+        src = cv;
+        applySrc();                                            // 以旋轉後的圖重畫、重置框
+      };
 
       // 拖曳畫新框（在 stage 內以顯示座標計算）
       let drag = null;
@@ -1431,21 +1574,22 @@ function cropImage(file){
         stage.removeEventListener('pointerdown', onDown);
         stage.removeEventListener('pointermove', onMove);
         stage.removeEventListener('pointerup', onUp);
-        $('#ocrCropOk').onclick = $('#ocrCropFull').onclick = $('#ocrCropCancel').onclick = null;
+        $('#ocrCropOk').onclick = $('#ocrCropFull').onclick = $('#ocrCropCancel').onclick = $('#ocrCropRotate').onclick = null;
       };
-      // 由原圖（原始解析度）裁出指定區域
+      // 由目前 src（旋轉後的原始解析度）裁出指定區域
       const cropTo = (sx,sy,sw,sh) => {
         const cv = document.createElement('canvas');
         cv.width = Math.max(1, Math.round(sw)); cv.height = Math.max(1, Math.round(sh));
-        cv.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+        cv.getContext('2d').drawImage(src, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
         return cv;
       };
+      $('#ocrCropRotate').onclick = rotate;
       $('#ocrCropOk').onclick = () => {
         const small = box.w < 10 || box.h < 10;                 // 框太小→當整張
         const x = small?0:box.x, y = small?0:box.y, w = small?dispW:box.w, h = small?dispH:box.h;
         cleanup(); resolve(cropTo(x/ds, y/ds, w/ds, h/ds));     // 顯示座標 ÷ 縮放比 → 原圖座標
       };
-      $('#ocrCropFull').onclick = () => { cleanup(); resolve(cropTo(0, 0, natW, natH)); };
+      $('#ocrCropFull').onclick = () => { cleanup(); resolve(cropTo(0, 0, dimW(), dimH())); };
       $('#ocrCropCancel').onclick = () => { cleanup(); resolve(null); };
     });
   });
@@ -2005,6 +2149,7 @@ function toast(msg){
 buildUI();
 addSubRow();             // 附屬建物先放一列空白（可按「＋新增」或由謄本辨識多筆覆蓋）
 addCommonRow();          // 共有部分先放一列空白（可按「＋新增」或由謄本辨識多筆覆蓋）
+renderAttachUI();        // 生成附件影像各分類上傳區（現場照片／證件／存摺／鑰匙／其他）
 togglePark();
 togglePay();
 toggleConf();
