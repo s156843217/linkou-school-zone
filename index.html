@@ -93,6 +93,9 @@
   .zc-comm:hover{border-color:var(--clay);background:var(--bg)}
   .zc-comm .zc-sub{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
   .zc-empty{color:var(--ink-soft);font-size:13px;padding:6px 0}
+  /* 學校特色區（看某校學區時呈現亮點介紹） */
+  .zc-feature{margin:10px 0 4px;padding:10px 12px;background:var(--bg);border-radius:10px}
+  .zc-feature .zc-feature-p{font-size:13px;color:var(--ink);line-height:1.6;margin-top:6px}
 
   .results{display:flex;flex-direction:column;gap:14px}
   .placeholder{padding:38px 22px;text-align:center;color:var(--ink-soft)}
@@ -291,7 +294,7 @@
       <div class="tgos-help-text">
         🏛️ <b>想百分百確認學區？</b>本工具僅供快查參考，最終以官方公告為準。可點右側前往<b>新北市政府教育局「國中小學區查詢」</b>官方頁面核對。
       </div>
-      <a class="tgos-btn" href="https://www.ntpc.edu.tw/home.jsp?id=3d145d2a095e211d&act=be4f48068b2b0031&dataserno=1c315339394b6ae7716f5ceb68344ac5" target="_blank" rel="noopener noreferrer">
+      <a class="tgos-btn" href="https://www.ntpc.edu.tw/home.jsp?id=3d145d2a095e211d&act=be4f48068b2b0031&dataserno=1c7444cb5c0f98e9555ff2988f781147" target="_blank" rel="noopener noreferrer">
         🏫 查教育局官方學區 <span class="ext">↗</span>
       </a>
     </div>
@@ -536,30 +539,28 @@ function communityForSchool(li,lin,school,zone){
   return null;
 }
 
-/* 學校學區卡：列出該校學區內的社區（主學區一組、可自由選填的另一組），寫入右側結果區。 */
+/* 學校學區卡：呈現該校基本資料、特色與額滿狀態，寫入右側結果區。
+ * （不再列出符合社區清單——社區改由地圖範圍與地址／社區查詢呈現。） */
 function renderSchoolZone(school,zone,skipped){
-  const info=SCHOOLS[school]||{};
-  const base=[],free=[];
+  const info=SCHOOLS[school]||{};   // 地址 / 電話 / 官網
+  const note=INFO[school]||{};      // 亮點標籤 tag、介紹話術 p
+  // 統計主學區涵蓋幾個里（僅供地圖說明用，不再逐一列出社區）
+  const liSet=new Set();
   for(const name in COMMUNITY){
     const c=COMMUNITY[name];
-    const rel=communityForSchool(c.li,c.lin,school,zone);
-    if(rel==='base')base.push([name,c]);
-    else if(rel==='free')free.push([name,c]);
+    if(communityForSchool(c.li,c.lin,school,zone)==='base')liSet.add(c.li);
   }
-  const liList=[...new Set(base.map(x=>x[1].li))];
-  const isFull=zone==='es'&&FULL_ES.includes(school);
-  const isCityFree=zone==='es'&&CITY_FREE_ES.includes(school);
   const dotColor=zone==='es'?'var(--clay)':'var(--teal)';
-  const item=([name,c])=>`<button class="zc-comm" data-comm="${name.replace(/"/g,'&quot;')}">${name}<span class="zc-sub">${c.li}${c.lin?` ${c.lin}鄰`:''}</span></button>`;
   let html=`<div class="panel rcard">
       <h3><span class="dot" style="background:${dotColor}"></span>${school} · ${zone==='es'?'國小':'國中'}學區範圍</h3>
-      <div class="zc-meta">${info.addr?`📍 ${info.addr}`:''}${info.tel?`　☎ ${info.tel}`:''}</div>`;
-  if(isFull)html+=`<div class="disc" style="margin:8px 0">⚠️ <b>額滿學校</b>：須父母與學童共同設籍＋居住事實，超額依設籍先後排序，越早設籍越有利。</div>`;
-  else if(isCityFree)html+=`<div class="disc" style="margin:8px 0">✅ <b>全市自由學區</b>：設籍後通常可順利入學，額滿時抽籤。</div>`;
-  html+=`<div class="zc-hint">主學區涵蓋 <b>${liList.length}</b> 個里、<b>${base.length}</b> 筆社區（點社區可定位查詳細學區）。地圖<b>實線</b>為整里屬本校、<b>虛線</b>為里內部分鄰屬本校（概略範圍，以里為單位）。</div>`;
-  if(skipped&&skipped.length)html+=`<div class="disc" style="margin:8px 0">ℹ️ <b>${skipped.join('、')}</b> 的里界圖資有誤，暫未顯示於地圖（社區清單與學區判定仍正確，圖資待以官方資料修復）。</div>`;
-  html+=`<div class="zc-list">${base.length?base.map(item).join(''):'<div class="zc-empty">此範圍查無建檔社區</div>'}</div>`;
-  if(free.length)html+=`<details class="acc panel" style="margin-top:10px"><summary>另有 ${free.length} 筆社區可「自由選填」本校 <span class="chev">▾</span></summary><div class="body"><div class="zc-list">${free.map(item).join('')}</div></div></details>`;
+      <div class="zc-meta">${info.addr?`📍 ${info.addr}`:''}${info.tel?`　☎ ${info.tel}`:''}${info.web?`　🌐 <a href="https://${info.web}" target="_blank" rel="noopener noreferrer">官網↗</a>`:''}</div>`;
+  // 學校特色 / 亮點
+  if(note.tag||note.p)html+=`<div class="zc-feature">${note.tag?`<span class="tag free">${note.tag}</span>`:''}${note.p?`<div class="zc-feature-p">${note.p}</div>`:''}</div>`;
+  // 額滿狀態（額滿與否、歷年最後設籍日；額滿制度為國小適用，國中不顯示）
+  if(zone==='es')html+=riskBlock(school);
+  // 地圖說明
+  html+=`<div class="zc-hint">主學區涵蓋 <b>${liSet.size}</b> 個里。地圖<b>實線</b>為整里屬本校、<b>虛線</b>為里內部分鄰屬本校（概略範圍，以里為單位）。</div>`;
+  if(skipped&&skipped.length)html+=`<div class="disc" style="margin:8px 0">ℹ️ <b>${skipped.join('、')}</b> 的里界圖資有誤，暫未顯示於地圖（學區判定仍正確，圖資待以官方資料修復）。</div>`;
   html+=`</div>`;
   $("#results").innerHTML=html;
   $("#copybar").style.display="none";   // 學校範圍模式：不顯示「複製查詢摘要」
@@ -932,11 +933,6 @@ function buildSchoolPicker(){
     }
     const zone = mapZone==='jh' ? 'jh' : 'es';   // 看國小或國中由上方鈕決定
     renderSchoolZone(school,zone,drawSchoolZoneByLi(school,zone));
-  });
-  // 點社區卡片 → 帶入既有社區查詢流程定位（render 會自動重置下拉）
-  $("#results").addEventListener('click',e=>{
-    const el=e.target.closest('.zc-comm'); if(!el)return;
-    $("#commInput").value=el.dataset.comm; $("#commBtn").click();
   });
 }
 

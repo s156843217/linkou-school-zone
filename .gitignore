@@ -4,6 +4,9 @@ rent/reference/
 # 實價登錄原始資料源（430MB+ XML/zip/xlsx）— 僅供本機離線統計，網站執行時不載入，切勿上傳
 price_data/
 
+# 林口學區 115 學年度切換用的官方原始檔（學區一覽表 PDF 等）— 僅供本機對照，網站不載入
+reference/
+
 # 編輯器 / 系統暫存
 .DS_Store
 Thumbs.db
