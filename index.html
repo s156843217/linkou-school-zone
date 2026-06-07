@@ -10,6 +10,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+/* 防同業以 iframe 內嵌冒用本工具：偵測到被「他站」內嵌就把整頁導回本站。
+ * （純前端、原始碼公開，無法真正防複製；此舉只擋「嵌進別人網站冒充自家工具」。） */
+(function(){
+  if(window.top===window.self)return;                 // 沒被內嵌 → 正常
+  try{
+    if(window.top.location.hostname!==location.hostname){ window.top.location.href=location.href; }
+  }catch(e){ window.top.location.href=location.href; } // 跨域無法讀 top → 必為他站內嵌，導回本站
+})();
+</script>
 <style>
   :root{
     --bg:#FBF6EE; --bg2:#F4ECDF; --ink:#26221C; --ink-soft:#5C544A;
@@ -34,7 +44,19 @@
   .hero p{color:#E7D7BE;font-size:14px;margin-top:6px;max-width:46ch}
   .hero .badge{font-family:var(--serif);font-size:13px;font-weight:700;color:#2C2620;background:var(--gold);
     padding:5px 12px;border-radius:999px;display:inline-block;align-self:flex-start;margin-bottom:8px}
-  .hero .yr{text-align:right;font-size:12px;color:#C9B89B}
+  .hero .yr{text-align:right;line-height:1.6;color:#E7D7BE}
+  .hero .yr .yr-biz{display:block;font-family:var(--serif);font-size:16px;font-weight:700;color:#F3E6CE;letter-spacing:.3px}
+  .hero .yr .yr-nm{display:block;font-size:15px;font-weight:600;color:#E7D7BE;margin-top:3px}
+  /* 右下角固定品牌浮水印（整頁截圖都帶招牌；點擊捲到聯絡區） */
+  .brand-badge{position:fixed;right:14px;bottom:14px;z-index:1200;text-align:right;text-decoration:none;
+    font-family:var(--sans);font-size:12px;line-height:1.45;color:#F3E6CE;
+    background:rgba(44,38,32,.92);padding:8px 12px;border-radius:12px;
+    border:1px solid rgba(243,230,206,.28);box-shadow:var(--shadow);
+    opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .25s,transform .2s,background .15s}
+  .brand-badge.show{opacity:1;pointer-events:auto;transform:none}        /* 捲離頂部後才淡入 */
+  .brand-badge b{display:block;font-family:var(--serif);font-size:13px;color:#fff;letter-spacing:.3px}
+  .brand-badge.show:hover{background:rgba(44,38,32,1);transform:translateY(-2px)}
+  @media(max-width:600px){.brand-badge{font-size:11px;padding:6px 9px;right:8px;bottom:8px}.brand-badge b{font-size:12px}}
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
 
@@ -239,7 +261,7 @@
       <p>輸入地址或選里鄰，立刻查出國小、國中學區、額滿風險與設籍提醒，並在地圖上確認位置與里界範圍。</p>
     </div>
     <div class="yr">
-      太平洋房屋<br>林口捷運加盟店<br><span style="color:#E7D7BE">李天夏 · 温美慈</span>
+      <span class="yr-biz">太平洋房屋 · 林口捷運加盟店</span><span class="yr-nm">李天夏 · 温美慈</span>
     </div>
   </header>
 
@@ -356,7 +378,7 @@
   </div>
 
   <!-- 聯絡卡（置底） -->
-  <h2 class="sec-title"><span class="bar"></span>聯絡我們</h2>
+  <h2 id="contact" class="sec-title"><span class="bar"></span>聯絡我們</h2>
   <section class="panel contact">
     <div class="co">🏠 太平洋房屋 · 林口捷運加盟店</div>
     <div class="sub">買林口、問學區，歡迎與我們聯繫 👇 點一下即可加 LINE 或直撥</div>
@@ -387,6 +409,17 @@
     地圖：© OpenStreetMap 貢獻者　|　里界範圍依官方門牌座標重建　|　本工具僅供參考，正式入學資格請以學校公告為準
   </footer>
 </div>
+
+<!-- 右下角固定品牌浮水印：往下捲離頂部後才淡入（避免和右上品牌資訊重疊），點擊捲到聯絡區 -->
+<a class="brand-badge" href="#contact"><b>太平洋房屋 · 林口捷運加盟店</b>李天夏 · 温美慈　☎ 點我聯絡</a>
+<script>
+/* 浮水印只在捲離頂部（hero）後顯示，看頂部時不擋、看地圖/結果時帶招牌 */
+(function(){
+  var b=document.querySelector('.brand-badge'); if(!b)return;
+  var f=function(){ b.classList.toggle('show', window.scrollY>220); };
+  window.addEventListener('scroll',f,{passive:true}); f();
+})();
+</script>
 
 <div class="toast" id="toast"></div>
 
@@ -755,12 +788,13 @@ function buildSummary(){
   if(!lastResult)return"";
   const {li,lin,res}=lastResult;
   const linTxt=(lin!=null&&lin!=="")?`${lin}鄰`:"";
-  let t=`【林口學區查詢】${li}${linTxt}\n`;
+  let t=`🏠 太平洋房屋 · 林口捷運加盟店 ｜ 林口學區快查\n\n【林口學區查詢】${li}${linTxt}\n`;
   const esLines=res.es.map(r=>{const seg=res.es.length>1?`(${rangeLabel(r)})`:"";return r.base?`國小${seg}：${r.base}${FULL_ES.includes(r.base)?"（額滿學校，須提早設籍）":""}`:`國小${seg}：自由學區 ${r.free.join("/")}`;});
   const jhLines=res.jh.map(r=>{const seg=res.jh.length>1?`(${rangeLabel(r)})`:"";return r.base?`國中${seg}：${r.base}`:`國中${seg}：自由學區 ${r.free.join("/")}`;});
   t+=esLines.join("\n")+"\n"+jhLines.join("\n");
   t+=`\n\n※額滿學校須父母與學童共同設籍＋居住事實，超額依設籍先後排序，越早設籍越好。實際以學校當年度公告為準。`;
   t+=`\n\n———\n太平洋房屋 林口捷運加盟店\n李天夏 0936-123-288　LINE：https://line.me/ti/p/oCqi-eVJvI\n温美慈 0976-109-326　LINE：https://line.me/ti/p/KLYEW95HzP`;
+  t+=`\n🔎 線上學區快查：https://s156843217.github.io/linkou-school-zone/`;
   return t;
 }
 
