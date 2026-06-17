@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>照片裁切預覽工具 — 林口學區快查</title>
+<!--
+  這是一個「開發輔助工具」，不是給訪客看的正式頁面。
+  用途：預覽兩位營業員的照片在聯絡卡上被裁成正方形後的樣子，並用拉桿調整裁切焦點。
+  調到滿意後，把畫面下方產生的數值告訴 Claude（或自己貼進 index.html 的 .agent .photo 樣式）。
+  操作對應 CSS 的 object-position：左右＝水平 %、上下＝垂直 %。
+-->
+<style>
+  :root{
+    --clay:#c2683f; --clay-d:#9c4a26; --teal:#3a6b5f; --bg:#f6f1e7; --bg2:#fff;
+    --ink:#2c2620; --ink-soft:#6b6256; --line:#e6ddcd;
+    --shadow:0 6px 20px rgba(80,60,40,.12);
+    --serif:"Noto Serif TC",serif; --sans:"Noto Sans TC",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);padding:24px;line-height:1.6}
+  h1{font-family:var(--serif);color:var(--clay-d);font-size:22px;margin:0 0 4px}
+  .hint{font-size:13px;color:var(--ink-soft);margin:0 0 20px;max-width:680px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .card h2{font-family:var(--serif);font-size:19px;margin:0 0 14px;color:var(--clay-d)}
+  .previews{display:flex;align-items:flex-end;gap:18px;margin-bottom:16px}
+  /* 大預覽：放大看裁切細節 */
+  .big{width:220px;height:220px;border-radius:14px;object-fit:cover;border:1px solid var(--line);background:#eee}
+  /* 實際卡片上的尺寸：92px，和 index.html 一致 */
+  .real{width:92px;height:92px;border-radius:12px;object-fit:cover;border:1px solid var(--line);background:#eee}
+  .real-wrap{text-align:center}
+  .real-wrap small{display:block;color:var(--ink-soft);font-size:11px;margin-top:4px}
+  .ctl{margin:10px 0}
+  .ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);margin-bottom:4px}
+  .ctl input[type=range]{width:100%;accent-color:var(--clay)}
+  .out{margin-top:14px;background:var(--bg);border:1px dashed var(--clay);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--clay-d);display:flex;justify-content:space-between;align-items:center;gap:10px;word-break:break-all}
+  .copy{flex:0 0 auto;border:none;background:var(--teal);color:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:var(--sans)}
+  .copy:hover{filter:brightness(1.08)}
+  .err{color:#b3402a;font-size:13px}
+  .reset{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--ink-soft);cursor:pointer;margin-top:6px}
+</style>
+</head>
+<body>
+  <h1>照片裁切預覽工具</h1>
+  <p class="hint">
+    左右／上下拉桿可移動「正方形裁切框」要對齊照片的哪個位置（全身照通常要往上拉才框得到臉）。
+    右上的大圖方便你看細節，旁邊的小圖就是聯絡卡上實際 92px 的樣子。
+    調到滿意後，按「複製數值」把那行 <code>object-position</code> 貼給我，我幫你套進正式頁面。
+  </p>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+  // 要預覽的照片清單（對應 index.html 聯絡卡的兩位營業員）
+  const AGENTS = [
+    { name: "李天夏", file: "agent-lee.jpg" },
+    { name: "温美慈", file: "agent-wen.jpg" },
+  ];
+
+  const grid = document.getElementById("grid");
+
+  AGENTS.forEach(a => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h2>${a.name}　<span style="font-size:12px;color:var(--ink-soft)">${a.file}</span></h2>
+      <div class="previews">
+        <img class="big" alt="${a.name} 大預覽">
+        <div class="real-wrap">
+          <img class="real" alt="${a.name} 實際尺寸">
+          <small>卡片實際大小</small>
+        </div>
+      </div>
+      <div class="ctl">
+        <label><span>水平位置（左 ⇄ 右）</span><span class="vx">50%</span></label>
+        <input type="range" class="rx" min="0" max="100" value="50">
+      </div>
+      <div class="ctl">
+        <label><span>垂直位置（上 ⇅ 下）</span><span class="vy">12%</span></label>
+        <input type="range" class="ry" min="0" max="100" value="12">
+      </div>
+      <button class="reset">重設（50% / 12%）</button>
+      <div class="out"><span class="code"></span><button class="copy">複製數值</button></div>
+    `;
+    grid.appendChild(card);
+
+    const big = card.querySelector(".big");
+    const real = card.querySelector(".real");
+    const rx = card.querySelector(".rx");
+    const ry = card.querySelector(".ry");
+    const vx = card.querySelector(".vx");
+    const vy = card.querySelector(".vy");
+    const code = card.querySelector(".code");
+    const copyBtn = card.querySelector(".copy");
+    const resetBtn = card.querySelector(".reset");
+
+    big.src = a.file;
+    real.src = a.file;
+
+    // 照片不存在時提示
+    big.onerror = () => {
+      card.querySelector(".previews").innerHTML =
+        `<p class="err">找不到 ${a.file}，請確認照片已放進 img 資料夾且檔名正確。</p>`;
+    };
+
+    function update() {
+      const x = rx.value, y = ry.value;
+      const pos = `${x}% ${y}%`;
+      big.style.objectPosition = pos;
+      real.style.objectPosition = pos;
+      vx.textContent = x + "%";
+      vy.textContent = y + "%";
+      code.textContent = `object-position:${pos}`;
+    }
+    rx.oninput = update;
+    ry.oninput = update;
+    resetBtn.onclick = () => { rx.value = 50; ry.value = 12; update(); };
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(`${a.name} → ${code.textContent}`).then(() => {
+        const t = copyBtn.textContent; copyBtn.textContent = "已複製！";
+        setTimeout(() => copyBtn.textContent = t, 1200);
+      });
+    };
+    update();
+  });
+</script>
+</body>
+</html>

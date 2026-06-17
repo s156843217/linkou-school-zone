@@ -198,6 +198,11 @@
   .agents{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:680px){.agents{grid-template-columns:1fr}}
   .agent{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg2)}
+  /* 照片在左、姓名／電話／按鈕在右 */
+  .agent .top{display:flex;gap:14px;align-items:flex-start}
+  /* 照片為裁好的正方形頭肩照，置中即可；若日後換成非方形照可用裁切工具 img/crop-tool.html 調 object-position */
+  .agent .photo{width:92px;height:92px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 50%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
+  .agent .info{flex:1 1 auto;min-width:0}
   .agent .nm{font-family:var(--serif);font-weight:900;font-size:21px}
   .agent .ph{font-size:14px;color:var(--ink-soft);margin:2px 0 13px}
   .agent .acts{display:flex;gap:9px;flex-wrap:wrap}
@@ -384,20 +389,30 @@
     <div class="sub">買林口、問學區，歡迎與我們聯繫 👇 點一下即可加 LINE 或直撥</div>
     <div class="agents">
       <div class="agent">
-        <div class="nm">李天夏</div>
-        <div class="ph">📞 0936-123-288</div>
-        <div class="acts">
-          <a class="btn btn-line" href="https://line.me/ti/p/oCqi-eVJvI" target="_blank" rel="noopener">＋ 加 LINE</a>
-          <a class="btn btn-call" href="tel:0936123288">撥打電話</a>
+        <div class="top">
+          <img class="photo" src="img/agent-lee.jpg" alt="李天夏" loading="lazy" onerror="this.style.display='none'">
+          <div class="info">
+            <div class="nm">李天夏</div>
+            <div class="ph">📞 0936-123-288</div>
+            <div class="acts">
+              <a class="btn btn-line" href="https://line.me/ti/p/oCqi-eVJvI" target="_blank" rel="noopener">＋ 加 LINE</a>
+              <a class="btn btn-call" href="tel:0936123288">撥打電話</a>
+            </div>
+          </div>
         </div>
         <div class="lic">不動產經紀人 (114)新北經字第004786號<br>營業員字號 (108)登字第352140號</div>
       </div>
       <div class="agent">
-        <div class="nm">温美慈</div>
-        <div class="ph">📞 0976-109-326</div>
-        <div class="acts">
-          <a class="btn btn-line" href="https://line.me/ti/p/KLYEW95HzP" target="_blank" rel="noopener">＋ 加 LINE</a>
-          <a class="btn btn-call" href="tel:0976109326">撥打電話</a>
+        <div class="top">
+          <img class="photo" src="img/agent-wen.jpg" alt="温美慈" loading="lazy" onerror="this.style.display='none'">
+          <div class="info">
+            <div class="nm">温美慈</div>
+            <div class="ph">📞 0976-109-326</div>
+            <div class="acts">
+              <a class="btn btn-line" href="https://line.me/ti/p/KLYEW95HzP" target="_blank" rel="noopener">＋ 加 LINE</a>
+              <a class="btn btn-call" href="tel:0976109326">撥打電話</a>
+            </div>
+          </div>
         </div>
         <div class="lic">營業員字號 (113)登字第471408號</div>
       </div>
