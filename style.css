@@ -40,7 +40,9 @@ header.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:200p
 .hero p{color:#E7D7BE;font-size:14px;margin-top:6px;max-width:46ch}
 .hero .badge{font-family:var(--serif);font-size:13px;font-weight:700;color:#2C2620;background:var(--gold);
   padding:5px 12px;border-radius:999px;display:inline-block;align-self:flex-start;margin-bottom:8px}
-.hero .yr{text-align:right;font-size:12px;color:#C9B89B}
+.hero .yr{text-align:right;line-height:1.6;color:#E7D7BE}
+.hero .yr .yr-biz{display:block;font-family:var(--serif);font-size:16px;font-weight:700;color:#F3E6CE;letter-spacing:.3px}
+.hero .yr .yr-nm{display:block;font-size:15px;font-weight:600;color:#E7D7BE;margin-top:3px}
 
 /* 卡片 */
 .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
