@@ -196,17 +196,19 @@
   .contact .co{font-family:var(--serif);font-weight:900;font-size:19px;color:var(--clay-d);display:flex;align-items:center;gap:8px}
   .contact .sub{font-size:13px;color:var(--ink-soft);margin:4px 0 16px}
   .agents{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:680px){.agents{grid-template-columns:1fr} .agent .photo{width:150px;height:150px}}
+  /* 手機版：改直排（照片在上置中、文字在下滿寬靠左），讓照片可以放到最大 */
+  @media(max-width:680px){.agents{grid-template-columns:1fr} .agent .top{flex-direction:column;align-items:stretch} .agent .photo{width:210px;height:280px;align-self:center;margin-bottom:4px} .agent .info{text-align:center;max-width:300px;margin:0 auto} .agent .lic{text-align:center} .agent .nm{font-size:25px} .agent .ph{font-size:16px}}
   .agent{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg2)}
   /* 照片在左、姓名／電話／按鈕在右 */
-  .agent .top{display:flex;gap:14px;align-items:flex-start}
-  /* 正方形去背透明 PNG：整張完整顯示、置中即可；底色用米色 --bg 襯托人像；可用 img/crop-tool.html 微調 object-position */
-  .agent .photo{width:120px;height:120px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 50%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
+  .agent .top{display:flex;gap:14px;align-items:center}
+  /* 去背透明 PNG 為半身照、四周留白多：改用直式框 + object-fit:cover，讓 CSS 自動裁掉左右留白、往上對齊只露上半身，人臉才會明顯放大（不動原圖）。object-position 的垂直值可微調對齊（值越小越往上） */
+  .agent .photo{width:160px;height:210px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 12%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
   .agent .info{flex:1 1 auto;min-width:0}
-  .agent .nm{font-family:var(--serif);font-weight:900;font-size:21px}
-  .agent .ph{font-size:14px;color:var(--ink-soft);margin:2px 0 13px}
+  .agent .nm{font-family:var(--serif);font-weight:900;font-size:30px}
+  .agent .ph{font-size:19px;color:var(--ink-soft);margin:4px 0 16px}
   .agent .acts{display:flex;gap:9px;flex-wrap:wrap}
-  .agent .acts a{flex:1 1 auto;text-align:center;text-decoration:none}
+  /* 聯絡卡按鈕加大（不動全站共用的 .btn 本體） */
+  .agent .acts a{flex:1 1 auto;text-align:center;text-decoration:none;font-size:16px;padding:14px 20px}
   .btn-line{background:#06C755;color:#fff} .btn-line:hover{background:#05b34d}
   .btn-call{background:#2C2620;color:#fff} .btn-call:hover{background:#000}
   .lic{font-size:11px;color:#aa9b85;margin-top:11px;line-height:1.55}
