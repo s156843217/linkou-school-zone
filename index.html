@@ -200,8 +200,8 @@
   .agent{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg2)}
   /* 照片在左、姓名／電話／按鈕在右 */
   .agent .top{display:flex;gap:14px;align-items:flex-start}
-  /* 照片為裁好的正方形頭肩照，置中即可；若日後換成非方形照可用裁切工具 img/crop-tool.html 調 object-position */
-  .agent .photo{width:92px;height:92px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 50%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
+  /* 去背透明 PNG（上半身直式），靠上對齊才不會切到頭頂；底色用米色 --bg 襯托人像；可用 img/crop-tool.html 微調 object-position */
+  .agent .photo{width:92px;height:92px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 8%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
   .agent .info{flex:1 1 auto;min-width:0}
   .agent .nm{font-family:var(--serif);font-weight:900;font-size:21px}
   .agent .ph{font-size:14px;color:var(--ink-soft);margin:2px 0 13px}
@@ -390,7 +390,7 @@
     <div class="agents">
       <div class="agent">
         <div class="top">
-          <img class="photo" src="img/agent-lee.jpg" alt="李天夏" loading="lazy" onerror="this.style.display='none'">
+          <img class="photo" src="img/agent-lee.png" alt="李天夏" loading="lazy" onerror="this.style.display='none'">
           <div class="info">
             <div class="nm">李天夏</div>
             <div class="ph">📞 0936-123-288</div>
@@ -404,7 +404,7 @@
       </div>
       <div class="agent">
         <div class="top">
-          <img class="photo" src="img/agent-wen.jpg" alt="温美慈" loading="lazy" onerror="this.style.display='none'">
+          <img class="photo" src="img/agent-wen.png" alt="温美慈" loading="lazy" onerror="this.style.display='none'">
           <div class="info">
             <div class="nm">温美慈</div>
             <div class="ph">📞 0976-109-326</div>
