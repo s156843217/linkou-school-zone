@@ -199,8 +199,8 @@
   .agent{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg2)}
   /* 照片在左、姓名／電話／按鈕在右 */
   .agent .top{display:flex;gap:14px;align-items:flex-start}
-  /* 去背透明 PNG（上半身直式），靠上對齊才不會切到頭頂；底色用米色 --bg 襯托人像；可用 img/crop-tool.html 微調 object-position */
-  .agent .photo{width:92px;height:92px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 8%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
+  /* 正方形去背透明 PNG：整張完整顯示、置中即可；底色用米色 --bg 襯托人像；可用 img/crop-tool.html 微調 object-position */
+  .agent .photo{width:92px;height:92px;flex:0 0 auto;border-radius:12px;object-fit:cover;object-position:50% 50%;border:1px solid var(--line);background:var(--bg);box-shadow:var(--shadow)}
   .agent .info{flex:1 1 auto;min-width:0}
   .agent .nm{font-family:var(--serif);font-weight:900;font-size:21px}
   .agent .ph{font-size:14px;color:var(--ink-soft);margin:2px 0 13px}
