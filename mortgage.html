@@ -59,9 +59,24 @@
   /* 林口產品建議 */
   .product-suggest{margin-top:14px;padding:12px 14px;background:#F0F6F3;border:1px solid #C7E0D0;border-radius:12px;display:none}
   .product-suggest.show{display:block}
-  .product-suggest .ps-title{font-size:12px;font-weight:700;color:var(--teal-d);margin-bottom:4px}
+  .product-suggest .ps-title{font-size:12px;font-weight:700;color:var(--teal-d);margin-bottom:8px}
   .product-suggest .ps-body{font-size:13.5px;color:var(--ink);font-weight:700}
-  .product-suggest .ps-note{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+  .product-suggest .ps-note{font-size:11.5px;color:var(--ink-soft);margin-top:8px;line-height:1.6}
+
+  /* 底部三類產品比較卡（成屋／預售／透天） */
+  .type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:4px 0}
+  .type-card{padding:12px 13px;border-radius:12px;border:1.5px solid var(--line);background:#fff}
+  .type-card.tc-ref{background:var(--bg2);border-style:dashed}
+  .tc-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px}
+  .tc-name{font-weight:900;font-size:14px;color:var(--clay-d)}
+  .tc-tag{font-size:10px;font-weight:700;color:var(--teal-d);background:#E3F0E8;padding:2px 6px;border-radius:6px;white-space:nowrap}
+  .tc-tag.ref{color:#9a7a3e;background:#F6ECD4}
+  .tc-sub{font-size:11.5px;color:var(--ink-soft);margin-bottom:8px;line-height:1.5}
+  .tc-ping{font-family:var(--serif);font-size:23px;font-weight:900;color:var(--ink);line-height:1}
+  .tc-unit{font-size:12px;color:var(--ink-soft);font-weight:400}
+  .tc-indoor{font-size:12px;color:var(--clay-d);margin-top:6px}
+  .tc-indoor b{font-size:14px;font-weight:900}
+  .tc-note{font-size:11px;color:var(--ink-soft);margin-top:6px;line-height:1.5}
 
   /* 市場參考表格 */
   .mkt-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -481,18 +496,45 @@
   }
 
   /* ── 林口房產類型對應 ──────── */
+  /* 依「總價預算」呈現同一筆錢在林口三種房型（成屋／預售／透天）大概買得到什麼。
+     成屋、預售樣本足→依各自單價精準換算坪數；透天樣本少→只給總價門檻參考。 */
   function showProduct(priceWan, selector) {
     const el = $(selector);
     if (!el) return;
-    if (typeof LINKOU_PRODUCTS === 'undefined' || !LINKOU_PRODUCTS.length) {
+    if (typeof LINKOU_TYPES === 'undefined' || !LINKOU_TYPES.length) {
       el.classList.remove('show'); return;
     }
-    const match = LINKOU_PRODUCTS.find(p => priceWan >= p.min && priceWan < p.max);
-    if (!match) { el.classList.remove('show'); return; }
+    const INDOOR_PCT = 0.67; // 室內（主+附+陽台）約佔登記坪數，扣公設與車位
+
+    const cards = LINKOU_TYPES.map(t => {
+      if (t.calc) {
+        const ping   = priceWan / t.unit;        // 可購登記坪數（含公設、已扣車位單價）
+        const indoor = ping * INDOOR_PCT;         // 室內概估
+        const reach  = priceWan >= t.totalMed * 0.7; // 預算是否接近該類常見總價
+        return `<div class="type-card">
+          <div class="tc-head"><span class="tc-name">${t.name}</span><span class="tc-tag">${t.tag}</span></div>
+          <div class="tc-sub">${t.sub}・單價約 ${t.unit} 萬/坪</div>
+          <div class="tc-ping">${ping.toFixed(1)}<span class="tc-unit"> 坪</span></div>
+          <div class="tc-indoor">室內約 <b>${indoor.toFixed(1)}</b> 坪　常見 ${t.roomMed} 房</div>
+          <div class="tc-note">${reach ? t.note : '此預算偏低，' + t.name + '選擇較有限。'}</div>
+        </div>`;
+      }
+      // 透天：樣本少，改用總價門檻參考，不做精準逐坪試算
+      const reach = priceWan >= t.threshold;
+      const ping  = priceWan / t.unit;
+      return `<div class="type-card tc-ref">
+        <div class="tc-head"><span class="tc-name">${t.name}</span><span class="tc-tag ref">${t.tag}</span></div>
+        <div class="tc-sub">${t.sub}・門檻約 ${t.threshold.toLocaleString('zh-TW')} 萬起</div>
+        <div class="tc-ping">${reach ? '可考慮' : '門檻不足'}</div>
+        <div class="tc-indoor">${reach ? '約 ' + ping.toFixed(0) + ' 坪含地（' + t.roomMed + ' 房）' : '林口透天總價多在 3,000 萬以上'}</div>
+        <div class="tc-note">${t.note}</div>
+      </div>`;
+    }).join('');
+
     el.innerHTML =
-      `<div class="ps-title">🏠 在林口約可考慮（實價登錄參考）</div>` +
-      `<div class="ps-body">${match.label}：${match.summary}</div>` +
-      `<div class="ps-note">資料來源：內政部實價登錄近一年（114Q1～115Q1），林口區住宅成交統計，僅供參考</div>`;
+      `<div class="ps-title">🏠 這筆預算（約 ${fmt(priceWan)} 萬）在林口可考慮的房型</div>` +
+      `<div class="type-grid">${cards}</div>` +
+      `<div class="ps-note">資料來源：內政部實價登錄（${LINKOU_TYPES[0].window}・林口住宅成交，已扣車位）。同一筆預算下，預售單價較高、透天總價門檻高，請依需求權衡；實際以現場行情為準。</div>`;
     el.classList.add('show');
   }
 

@@ -22,37 +22,34 @@ const LINKOU_ZONES = [
   { name: "麗園國小",    medPrice: 39.1, priceRange: [29.3, 47.9], count:  82, ageMed: 19, roomMed: 3, indoorPct: 0.658 },
 ];
 
-// ── 林口各總價區間對應房產類型（供試算結果快速提示用） ───────
-// 格式：{ min, max, label, summary }
-const LINKOU_PRODUCTS = [
+// ── 各產品類型行情（林口・依建物型態分類，供底部「這筆預算能買什麼」三類比較） ──
+// 來源：內政部實價登錄 opendata 季 zip（plvr.land.moi.gov.tw/DownloadSeason）
+//   成屋 f_lvr_land_a（依「建物型態」拆出 集合住宅／透天）；預售 f_lvr_land_b
+//   本批：114S2+114S3+114S4+115S1 合併（≈114/4–115/3 近一年），依「編號」去重；預售排除「解約」
+//   ※ 115S2（115/4–6）內政部尚未釋出；未來自動管線抓最近數季滾動更新即可
+// 計算口徑：房屋單價 = (總價 − 車位價) ÷ (不含車位坪數) ÷ 10000（萬/坪）
+//   並排除「車位面積>0 但車位價=0」之綁約筆（拆不開、會高估）
+//   ※ 已驗證：車位有計價時與政府「單價元平方公尺」欄逐筆相同
+// 欄位：unit 單價中位(萬/坪)；unitRange [Q1,Q3]；totalMed 總價中位(萬)；
+//       ageMed 屋齡中位(年，預售為 null)；pingMed 坪中位；roomMed 房數中位；n 樣本數
+//       calc=true 可依預算精準試算坪數；false 樣本少、僅作總價門檻參考
+const LINKOU_TYPES = [
   {
-    min: 0, max: 1000,
-    label: "1,000 萬以下",
-    summary: "老市區公寓或套房為主・屋齡約 36 年・約 22 坪・1 房",
+    key: "resale", name: "成屋", sub: "電梯大樓／華廈", tag: "看屋即入住",
+    unit: 46.3, unitRange: [42.4, 53.7], totalMed: 1615, ageMed: 15, pingMed: 29.7, roomMed: 2,
+    n: 1470, window: "近一年", calc: true,
+    note: "現成可看實屋、可立即入住，屋齡中位約 15 年。",
   },
   {
-    min: 1000, max: 1400,
-    label: "1,000–1,400 萬",
-    summary: "中古華廈或住宅大樓・屋齡約 15 年・約 27 坪・2 房",
+    key: "presale", name: "預售屋", sub: "興建中／全新", tag: "全新可分期",
+    unit: 60.1, unitRange: [55.8, 67.1], totalMed: 1746, ageMed: null, pingMed: 26.0, roomMed: 2,
+    n: 1000, window: "近一年", calc: true,
+    note: "全新、可依工程期分期付款；單價約比成屋高三成，需等交屋。",
   },
   {
-    min: 1400, max: 1800,
-    label: "1,400–1,800 萬",
-    summary: "住宅大樓為主・屋齡約 11 年・約 31 坪・2 房",
-  },
-  {
-    min: 1800, max: 2500,
-    label: "1,800–2,500 萬",
-    summary: "近年新成屋・屋齡約 8 年・約 38 坪・3 房",
-  },
-  {
-    min: 2500, max: 3500,
-    label: "2,500–3,500 萬",
-    summary: "新成屋大坪數・屋齡約 8 年・約 57 坪・3 房",
-  },
-  {
-    min: 3500, max: 99999,
-    label: "3,500 萬以上",
-    summary: "大坪數住宅大樓或透天厝・屋齡約 11 年・約 94 坪・3 房以上",
+    key: "house", name: "透天／別墅", sub: "獨棟含土地", tag: "樣本少·參考",
+    unit: 41.9, unitRange: [33.0, 50.7], totalMed: 3708, threshold: 3000, ageMed: 19, pingMed: 84.2, roomMed: 4,
+    n: 63, window: "近一年", calc: false,
+    note: "總價門檻約 3,000 萬起、中位約 3,700 萬；近一年林口僅 63 筆成交，僅供方向參考。",
   },
 ];
