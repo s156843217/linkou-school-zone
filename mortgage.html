@@ -35,6 +35,11 @@
   #cGraceYearsWrap{display:none;align-items:center;gap:8px;flex:1 1 auto}
   #cGraceYearsWrap .field{flex:0 1 160px}
 
+  /* 含車位 toggle（三類字卡 / 地段試算共用樣式） */
+  .pk-check{display:inline-flex;align-items:center;gap:7px;cursor:pointer;margin:2px 0 12px}
+  .pk-check input[type=checkbox]{width:16px;height:16px;accent-color:var(--clay);cursor:pointer;flex-shrink:0}
+  .pk-check span{font-size:12.5px;font-weight:700;color:var(--ink-soft);user-select:none}
+
   /* 試算結果區塊 */
   .result-box{margin-top:16px;padding:18px 18px 14px;background:var(--bg2);
     border-radius:14px;border:1px solid var(--line);display:none}
@@ -351,10 +356,11 @@
         </div>
         <button class="btn" id="zBtnCalc" style="flex-shrink:0">試算各地段坪數</button>
       </div>
+      <label class="pk-check"><input type="checkbox" id="zPark" checked><span>含 1 個車位（約 200 萬，從預算先保留）</span></label>
       <div id="zResult" class="zone-result-wrap">
         <div class="zone-grid" id="zoneGrid"></div>
         <div style="font-size:11.5px;color:var(--ink-soft)">
-          試算以各地段中位數單價計算，實際坪數隨行情浮動。「坪（含公設）」為登記總面積；「室內坪數」＝主建物＋附屬建物＋陽台（已扣除公設與車位），佔比依各地段實價登錄分項面積統計（約 66–70%）。
+          試算以各地段中位數單價計算，實際坪數隨行情浮動。「坪（含公設）」為登記坪數（含公設、<b>不含車位</b>）；「室內坪數」＝主建物＋附屬建物＋陽台（已扣除公設與車位），佔比依各地段實價登錄分項面積統計（約 66–70%）。勾選「含車位」時，已先從預算保留 1 個車位（約 200 萬）再換算房屋坪數。
         </div>
       </div>
     </div>
@@ -496,6 +502,12 @@
   }
 
   /* ── 林口房產類型對應 ──────── */
+  /* 車位假設：林口購屋多數需搭 1 個車位，故預設先從總價預算保留此金額，
+     剩餘預算才用「不含車位單價」換算房屋坪數（單價本就已扣車位，口徑一致）。 */
+  const PARKING_WAN = 200;   // 1 個車位估價（萬元）
+  let prodIncPark = true;    // 底部三類字卡：是否含車位（可由字卡內開關切換）
+  let zoneIncPark = true;    // 各地段試算：是否含車位（可由地段區開關切換）
+
   /* 依「總價預算」呈現同一筆錢在林口三種房型（成屋／預售／透天）大概買得到什麼。
      成屋、預售樣本足→依各自單價精準換算坪數；透天樣本少→只給總價門檻參考。 */
   function showProduct(priceWan, selector) {
@@ -506,20 +518,33 @@
     }
     const INDOOR_PCT = 0.67; // 室內（主+附+陽台）約佔登記坪數，扣公設與車位
 
+    // 含車位時：先從總價預算保留 1 個車位（PARKING_WAN），剩餘才換算房屋坪數
+    const houseBudget = prodIncPark ? priceWan - PARKING_WAN : priceWan;
+
     const cards = LINKOU_TYPES.map(t => {
       if (t.calc) {
-        const ping   = priceWan / t.unit;        // 可購登記坪數（含公設、已扣車位單價）
+        // 預算扣完車位已不足以買房 → 不給坪數，提示改用不含車位
+        if (prodIncPark && houseBudget <= 0) {
+          return `<div class="type-card">
+            <div class="tc-head"><span class="tc-name">${t.name}</span><span class="tc-tag">${t.tag}</span></div>
+            <div class="tc-sub">${t.sub}・單價約 ${t.unit} 萬/坪</div>
+            <div class="tc-ping" style="font-size:20px">預算不足</div>
+            <div class="tc-indoor">光 1 個車位約需 ${PARKING_WAN} 萬</div>
+            <div class="tc-note">此預算扣除車位後不足以購屋，可取消「含車位」改看純房屋坪數。</div>
+          </div>`;
+        }
+        const ping   = houseBudget / t.unit;      // 房屋可購登記坪數（含公設、不含車位）
         const indoor = ping * INDOOR_PCT;         // 室內概估
-        const reach  = priceWan >= t.totalMed * 0.7; // 預算是否接近該類常見總價
+        const reach  = priceWan >= t.totalMed * 0.7; // 預算是否接近該類常見總價（含車位的總價）
         return `<div class="type-card">
           <div class="tc-head"><span class="tc-name">${t.name}</span><span class="tc-tag">${t.tag}</span></div>
           <div class="tc-sub">${t.sub}・單價約 ${t.unit} 萬/坪</div>
           <div class="tc-ping">${ping.toFixed(1)}<span class="tc-unit"> 坪</span></div>
-          <div class="tc-indoor">室內約 <b>${indoor.toFixed(1)}</b> 坪　常見 ${t.roomMed} 房</div>
+          <div class="tc-indoor">室內約 <b>${indoor.toFixed(1)}</b> 坪　常見 ${t.roomMed} 房${prodIncPark ? '　＋1 車位' : ''}</div>
           <div class="tc-note">${reach ? t.note : '此預算偏低，' + t.name + '選擇較有限。'}</div>
         </div>`;
       }
-      // 透天：樣本少，改用總價門檻參考，不做精準逐坪試算
+      // 透天：本身含車庫/土地，不另扣車位；樣本少，僅用總價門檻參考
       const reach = priceWan >= t.threshold;
       const ping  = priceWan / t.unit;
       return `<div class="type-card tc-ref">
@@ -533,9 +558,17 @@
 
     el.innerHTML =
       `<div class="ps-title">🏠 這筆預算（約 ${fmt(priceWan)} 萬）在林口可考慮的房型</div>` +
+      `<label class="pk-check"><input type="checkbox" class="pk-chk" ${prodIncPark ? 'checked' : ''}>` +
+        `<span>含 1 個車位（約 ${PARKING_WAN} 萬，從預算先保留）</span></label>` +
       `<div class="type-grid">${cards}</div>` +
-      `<div class="ps-note">資料來源：內政部實價登錄（${LINKOU_TYPES[0].window}・林口住宅成交，已扣車位）。同一筆預算下，預售單價較高、透天總價門檻高，請依需求權衡；實際以現場行情為準。</div>`;
+      `<div class="ps-note">資料來源：內政部實價登錄（${LINKOU_TYPES[0].window}・林口住宅成交，單價已扣車位）。` +
+        `${prodIncPark ? '上方坪數為「預算先保留 1 車位（約 ' + PARKING_WAN + ' 萬）後」可購的房屋坪數（成屋／預售；透天本身含車位不另扣）。' : '上方坪數未含車位，為預算全用於房屋的可購坪數。'}` +
+        `同一筆預算下，預售單價較高、透天總價門檻高，請依需求權衡；實際以現場行情為準。</div>`;
     el.classList.add('show');
+
+    // 字卡內「含車位」開關：切換後以同一筆預算重繪此面板
+    const chk = el.querySelector('.pk-chk');
+    if (chk) chk.addEventListener('change', e => { prodIncPark = e.target.checked; showProduct(priceWan, selector); });
   }
 
   /* ── 地段單價表格（頁面載入後產生） ─────────────── */
@@ -560,12 +593,19 @@
     const budget = parseFloat($('#zBudget').value);
     if (!budget || budget <= 0) { toast('請輸入購屋預算'); return; }
 
+    // 含車位時：先從預算保留 1 個車位（PARKING_WAN），剩餘才換算房屋坪數
+    zoneIncPark = $('#zPark').checked;
+    const houseBudget = zoneIncPark ? budget - PARKING_WAN : budget;
+    if (zoneIncPark && houseBudget <= 0) {
+      toast(`預算扣除車位（約 ${PARKING_WAN} 萬）後不足，請提高預算或取消「含車位」`); return;
+    }
+
     const grid = $('#zoneGrid');
     grid.innerHTML = LINKOU_ZONES.map(z => {
-      const ping = budget / z.medPrice;               // 登記總坪數（含公設）
-      const indoor = ping * z.indoorPct;              // 室內坪數＝總坪 × 室內佔比（主+附+陽台）
-      const pingLo = Math.round(budget / z.priceRange[1]);
-      const pingHi = Math.round(budget / z.priceRange[0]);
+      const ping = houseBudget / z.medPrice;          // 房屋登記坪數（含公設、不含車位）
+      const indoor = ping * z.indoorPct;              // 室內坪數＝房屋坪 × 室內佔比（主+附+陽台）
+      const pingLo = Math.round(houseBudget / z.priceRange[1]);
+      const pingHi = Math.round(houseBudget / z.priceRange[0]);
       return `<div class="zone-card">
         <div class="zc-name">${z.name}</div>
         <div>
@@ -573,7 +613,7 @@
           <span class="zc-unit">坪（含公設）</span>
         </div>
         <div class="zc-indoor">室內約 <b>${indoor.toFixed(1)}</b> 坪・主＋附＋陽台（佔 ${Math.round(z.indoorPct*100)}%）</div>
-        <div class="zc-note">總坪實際區間約 ${pingLo}–${pingHi} 坪・屋齡約 ${z.ageMed} 年</div>
+        <div class="zc-note">總坪實際區間約 ${pingLo}–${pingHi} 坪・屋齡約 ${z.ageMed} 年${zoneIncPark ? '・另含 1 車位' : ''}</div>
       </div>`;
     }).join('');
     $('#zResult').classList.add('show');
@@ -594,6 +634,8 @@
 
   $('#zBtnCalc').addEventListener('click', calcZone);
   $('#zBudget').addEventListener('keydown', e => { if (e.key === 'Enter') calcZone(); });
+  /* 切換「含車位」：若已試算過則即時重算 */
+  $('#zPark').addEventListener('change', () => { if ($('#zResult').classList.contains('show')) calcZone(); });
 
   /* Enter 鍵觸發 */
   ['#aMonthly', '#aExisting'].forEach(id => {
