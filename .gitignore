@@ -7,6 +7,9 @@ price_data/
 # 林口學區 115 學年度切換用的官方原始檔（學區一覽表 PDF 等）— 僅供本機對照，網站不載入
 reference/
 
+# TDX 公車資料 API 金鑰（Client Id / Secret）— 僅供本機抓資料腳本使用，切勿上傳
+tdx-secret.json
+
 # 編輯器 / 系統暫存
 .DS_Store
 Thumbs.db
