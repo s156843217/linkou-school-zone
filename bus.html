@@ -81,6 +81,8 @@
   .bchip:hover{border-color:var(--teal);background:var(--bg)}
   .bchip.on{background:var(--clay);color:#fff;border-color:var(--clay)}
   .bchip .src{font-size:10px;font-weight:700;opacity:.7;margin-left:5px}
+  .alias{font-size:10px;font-weight:700;color:var(--clay-d);background:#F6E5DC;border-radius:5px;padding:1px 5px;margin-left:5px;white-space:nowrap}
+  .bchip.on .alias{background:rgba(255,255,255,.25);color:#fff}
   /* 附近站牌清單 */
   .bstop{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line);
     border-radius:12px;background:#fff;margin-bottom:8px}
@@ -192,6 +194,17 @@
       <button class="btn ghost" id="addrBtn">🔍 定位並查公車</button>
     </div>
     <div class="hint">先用官方門牌資料庫精準定位，查不到才退回線上路名／路段定位。輸入越完整（含路段、巷弄、號）越準。</div>
+
+    <div class="or">或直接查公車路線</div>
+
+    <div class="row">
+      <div class="field">
+        <label class="lbl">🚌 輸入公車路線編號</label>
+        <input type="text" id="routeInput" placeholder="例：936、946、F236、林口-臺北車站…" autocomplete="off">
+      </div>
+      <button class="btn ghost" id="routeBtn">查整條走向</button>
+    </div>
+    <div class="hint">直接看整條路線「停哪些站、往哪裡開」。同編號的副線／區間車（如 946、946副）會一起列出來比較。</div>
 
     <div class="radius-row">
       <span class="rr-label">🚶 步行範圍</span>
@@ -404,6 +417,38 @@ const STOPS=(window.BUS_DATA&&BUS_DATA.stops)||[];
 /* 路線數字自然排序用的鍵 */
 function routeSortKey(n){const m=(n||'').match(/^\d+/);return [m?+m[0]:9999,n||''];}
 
+/* 自動標註「用起迄命名、沒編號」的路線（如「林口-捷運圓山站」）→ 找出同走廊的有號路線，
+ * 標成「≈936 直達」。比對：站名高度重疊(≥70%)且首尾站都被該有號路線涵蓋；
+ * 比對目標只取「乾淨編號」(不含連字號/中文)路線，避免標到 946副、F213黎明 這種本身有號的變體。
+ * 在載入時算一次，資料更新後會自動重算，不需維護對照表。 */
+const aliasOf={};
+(function buildAlias(){
+  const stopNames=r=>{const s=new Set();(r.dirs||[]).forEach(d=>(d.st||[]).forEach(x=>s.add(x[2])));return s;};
+  const keys=Object.keys(ROUTES);
+  const coded=keys.filter(k=>!/[-－]/.test(ROUTES[k].n)&&!/[一-鿿]/.test(ROUTES[k].n))
+                  .map(k=>({n:ROUTES[k].n,set:stopNames(ROUTES[k])}));
+  keys.filter(k=>/[-－]/.test(ROUTES[k].n)).forEach(k=>{
+    const r=ROUTES[k], dset=stopNames(r);
+    if(dset.size<3)return;
+    const ends=new Set();(r.dirs||[]).forEach(d=>{const st=d.st||[];if(st.length){ends.add(st[0][2]);ends.add(st[st.length-1][2]);}});
+    let best=null,bestScore=0;
+    coded.forEach(c=>{
+      let inter=0;dset.forEach(s=>{if(c.set.has(s))inter++;});
+      const score=inter/dset.size;
+      let endsOk=true;ends.forEach(e=>{if(!c.set.has(e))endsOk=false;});
+      if(endsOk&&score>=0.7&&score>bestScore){bestScore=score;best=c;}
+    });
+    if(best)aliasOf[k]=`≈${best.n}${dset.size<best.set.size?' 直達':''}`;
+  });
+})();
+
+/* 路線膠囊 HTML（附來源標籤與「≈936 直達」自動標註）*/
+function chipHtml(k){
+  const r=ROUTES[k]; const sl={NewTaipei:'新北',Taoyuan:'桃園',InterCity:'客運'}[r.src]||'';
+  const al=aliasOf[k]?`<span class="alias">${aliasOf[k]}</span>`:'';
+  return `<button class="bchip" data-k="${k}">${r.n}${al}<span class="src">${sl}</span></button>`;
+}
+
 /* 主流程：定位到某點 → 畫家點、附近站牌、列出路線 */
 function locate(lat,lon,label){
   lastPoint=[lat,lon,label];
@@ -463,11 +508,7 @@ function renderSummary(label,near,routeKeys,routeMap){
     const x=routeSortKey(ROUTES[a].n),y=routeSortKey(ROUTES[b].n);
     return x[0]-y[0]||(''+x[1]).localeCompare(y[1]);
   });
-  const srcLabel={NewTaipei:'新北',Taoyuan:'桃園',InterCity:'客運'};
-  const chips=sortedKeys.map(k=>{
-    const r=ROUTES[k]; const sl=srcLabel[r.src]||'';
-    return `<button class="bchip" data-k="${k}">${r.n}<span class="src">${sl}</span></button>`;
-  }).join('');
+  const chips=sortedKeys.map(chipHtml).join('');
 
   const stopHtml=near.map(({s,d})=>{
     const rn=[...new Set(s.r.map(k=>ROUTES[k]&&ROUTES[k].n).filter(Boolean))];
@@ -528,18 +569,50 @@ function showRoute(key){
   const srcLabel={NewTaipei:'新北市公車',Taoyuan:'桃園市公車',InterCity:'公路／國道客運'};
   $("#results").innerHTML=`
     <div class="panel bdetail">
-      <span class="bback" id="bback">← 返回附近路線</span>
-      <h3>🚌 ${r.n}</h3>
-      <div class="bsub" style="font-size:13px;color:var(--ink-soft)">${srcLabel[r.src]||''}・橘點為在你附近的站牌</div>
+      <span class="bback" id="bback">${lastPoint?'← 返回附近路線':'← 清除路線'}</span>
+      <h3>🚌 ${r.n}${aliasOf[key]?` <span class="alias" style="font-size:13px;vertical-align:middle">${aliasOf[key]}</span>`:''}</h3>
+      <div class="bsub" style="font-size:13px;color:var(--ink-soft)">${srcLabel[r.src]||''}・橘點為在你附近的站牌${aliasOf[key]?`<br><span style="color:var(--clay-d)">※ 這是「${aliasOf[key].replace('≈','')}」同走廊、停站較少的版本（TDX 未給此線編號）</span>`:''}</div>
       ${dirsHtml}
     </div>`;
-  $("#bback").addEventListener('click',()=>{ if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;} if(lastPoint)locate(lastPoint[0],lastPoint[1],lastPoint[2]); });
+  $("#bback").addEventListener('click',()=>{
+    if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
+    if(lastPoint)locate(lastPoint[0],lastPoint[1],lastPoint[2]);   // 從社區/地址查進來 → 回附近路線
+    else { map.setView(C,13); resetResults(); }                    // 從路線編號查進來 → 清空
+  });
   $("#results").querySelectorAll('.bdir-h').forEach(h=>h.addEventListener('click',()=>{
     const ol=$(`ol[data-ol="${h.dataset.i}"]`); if(ol)ol.style.display=ol.style.display==='none'?'block':'none';
   }));
 }
 
+/* 重置右側結果區為初始提示 */
+function resetResults(){
+  $("#results").innerHTML=`<div class="panel placeholder"><div class="big">🚌 還沒有查詢結果</div>
+    輸入社區或地址後，這裡會列出附近的<br>公車站牌與經過的路線。</div>`;
+}
+
+/* ============================ 依路線編號查整條走向 ============================ */
+function routeMatches(q){
+  q=q.trim().toLowerCase(); if(!q)return [];
+  // 名稱含該字串者全列出：打 946 會一起帶出 946 與 946副、打 920 帶出 920/920A/920副，方便比較
+  return Object.keys(ROUTES).filter(k=>(ROUTES[k].n||'').toLowerCase().includes(q)).slice(0,40);
+}
+function doRouteSearch(q){
+  if(!q){toast("請輸入公車路線編號");return;}
+  const m=routeMatches(q);
+  if(!m.length){toast(`查無路線「${q}」`);return;}
+  if(m.length===1){showRoute(m[0]);return;}                       // 只有一條 → 直接畫
+  // 多條相符 → 列出讓客戶選（同走廊的直達／區間車也會一起出現，方便比較）
+  const sorted=m.sort((a,b)=>{const x=routeSortKey(ROUTES[a].n),y=routeSortKey(ROUTES[b].n);return x[0]-y[0]||(''+x[1]).localeCompare(y[1]);});
+  const chips=sorted.map(chipHtml).join('');
+  $("#results").innerHTML=`<div class="panel bsum"><h3>🚌 符合「${q}」的路線（${m.length}）</h3>
+    <div class="bsub">點選要看走向的路線：</div>
+    <div class="broutes" style="margin-top:10px">${chips}</div></div>`;
+  $("#results").querySelectorAll('.bchip').forEach(el=>el.addEventListener('click',()=>showRoute(el.dataset.k)));
+}
+
 /* ============================ 事件綁定 ============================ */
+$("#routeBtn").addEventListener('click',()=>doRouteSearch($("#routeInput").value.trim()));
+$("#routeInput").addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doRouteSearch($("#routeInput").value.trim());}});
 $("#commInput").addEventListener('input',e=>{acIdx=-1;showAc(searchComm(e.target.value),e.target.value);});
 $("#commInput").addEventListener('focus',e=>{if(e.target.value)showAc(searchComm(e.target.value),e.target.value);});
 $("#commInput").addEventListener('keydown',e=>{
