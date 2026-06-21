@@ -107,6 +107,15 @@
     background:#fff;border:2px solid var(--teal)}
   .bdir li.here::before{background:var(--clay);border-color:var(--clay)}
   .bdir li.here{font-weight:700;color:var(--clay-d)}
+  /* 路線詳情：你附近的上車站牌（醒目區塊） */
+  .bboard{margin-top:12px;padding:12px 13px;border:1.5px solid var(--clay);border-radius:12px;background:#FBF1EB}
+  .bboard-t{font-size:13px;font-weight:700;color:var(--clay-d);margin-bottom:8px}
+  .bboard-it{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-top:1px dashed #E6CFC2}
+  .bboard-it:first-of-type{border-top:none;padding-top:0}
+  .bboard-it .bd{flex:0 0 50px;text-align:center;font-size:11px;font-weight:700;color:#fff;background:var(--clay);border-radius:8px;padding:5px 0}
+  .bboard-it .bn{font-size:15px;font-weight:700;color:var(--ink)}
+  .bboard-it .bgo{font-size:12px;color:var(--teal-d);margin-top:2px}
+  .bfull{margin-top:10px;width:100%}
 
   /* === 聯絡卡（與學區頁一致）=== */
   .contact{margin-top:18px;padding:22px}
@@ -550,8 +559,33 @@ function showRoute(key){
         .bindPopup(`<b>${s[2]}</b>`).addTo(routeLayer);
     });
   });
+
+  // 從社區/地址查進來時：找出這條路線在「步行範圍內、各方向最近」的上車站牌
+  const boarding=[];   // {name,d,to,lat,lon}
+  if(lastPoint){
+    r.dirs.forEach(d=>{
+      let best=null;
+      d.st.forEach(s=>{
+        const dd=distM(lastPoint[0],lastPoint[1],s[0],s[1]);
+        if(dd<=curR && (!best||dd<best.d)) best={name:s[2],d:dd,to:d.to,lat:s[0],lon:s[1]};
+      });
+      if(best)boarding.push(best);
+    });
+    // 上車站牌用大橘點醒目標記（疊在一般站牌之上）
+    boarding.forEach(b=>{
+      L.circleMarker([b.lat,b.lon],{radius:9,color:'#BD5E39',weight:3,fillColor:'#BD5E39',fillOpacity:.9})
+        .bindPopup(`<b>${b.name}</b><br><span style="font-size:12px;color:#555">往 ${b.to||'—'}・約 ${Math.round(b.d)} 公尺</span>`)
+        .addTo(routeLayer);
+    });
+  }
   routeLayer.addTo(map);
-  if(allPts.length)map.fitBounds(allPts,{padding:[40,40]});
+
+  // 地圖縮放：有定位點且找得到上車站 → 聚焦「你家＋上車站」（放大）；否則看整條路線
+  if(lastPoint && boarding.length){
+    map.fitBounds([[lastPoint[0],lastPoint[1]],...boarding.map(b=>[b.lat,b.lon])],{padding:[60,60],maxZoom:17});
+  } else if(allPts.length){
+    map.fitBounds(allPts,{padding:[40,40]});
+  }
 
   // 右側：路線詳情（每個方向可展開站序）
   const dirsHtml=r.dirs.map((d,i)=>{
@@ -566,12 +600,23 @@ function showRoute(key){
       <ol data-ol="${i}" ${i===0?'':'style="display:none"'}>${lis}</ol>
     </div>`;
   }).join('');
+  // 你附近的上車站牌區塊（只有從社區/地址查進來、且範圍內有站時才顯示）
+  const boardHtml=(lastPoint&&boarding.length)?`
+    <div class="bboard">
+      <div class="bboard-t">🚏 在你附近可搭乘的站牌</div>
+      ${boarding.map(b=>`<div class="bboard-it">
+        <span class="bd">${Math.round(b.d)}m</span>
+        <div><div class="bn">${b.name}</div><div class="bgo">往 ${b.to||'—'}</div></div>
+      </div>`).join('')}
+      <button class="btn ghost bfull" id="bfull">🗺️ 看完整路線走向</button>
+    </div>`:'';
   const srcLabel={NewTaipei:'新北市公車',Taoyuan:'桃園市公車',InterCity:'公路／國道客運'};
   $("#results").innerHTML=`
     <div class="panel bdetail">
       <span class="bback" id="bback">${lastPoint?'← 返回附近路線':'← 清除路線'}</span>
       <h3>🚌 ${r.n}${aliasOf[key]?` <span class="alias" style="font-size:13px;vertical-align:middle">${aliasOf[key]}</span>`:''}</h3>
-      <div class="bsub" style="font-size:13px;color:var(--ink-soft)">${srcLabel[r.src]||''}・橘點為在你附近的站牌${aliasOf[key]?`<br><span style="color:var(--clay-d)">※ 這是「${aliasOf[key].replace('≈','')}」同走廊、停站較少的版本（TDX 未給此線編號）</span>`:''}</div>
+      <div class="bsub" style="font-size:13px;color:var(--ink-soft)">${srcLabel[r.src]||''}${lastPoint?'・大橘點為你附近的上車站牌':''}${aliasOf[key]?`<br><span style="color:var(--clay-d)">※ 這是「${aliasOf[key].replace('≈','')}」同走廊、停站較少的版本（TDX 未給此線編號）</span>`:''}</div>
+      ${boardHtml}
       ${dirsHtml}
     </div>`;
   $("#bback").addEventListener('click',()=>{
@@ -579,8 +624,21 @@ function showRoute(key){
     if(lastPoint)locate(lastPoint[0],lastPoint[1],lastPoint[2]);   // 從社區/地址查進來 → 回附近路線
     else { map.setView(C,13); resetResults(); }                    // 從路線編號查進來 → 清空
   });
+  // 「看完整路線走向」→ 縮放到整條路線
+  const bfull=$("#bfull");
+  if(bfull)bfull.addEventListener('click',()=>{ if(allPts.length)map.fitBounds(allPts,{padding:[40,40]}); });
   $("#results").querySelectorAll('.bdir-h').forEach(h=>h.addEventListener('click',()=>{
-    const ol=$(`ol[data-ol="${h.dataset.i}"]`); if(ol)ol.style.display=ol.style.display==='none'?'block':'none';
+    const ol=$(`ol[data-ol="${h.dataset.i}"]`); if(!ol)return;
+    const opening=ol.style.display==='none';
+    ol.style.display=opening?'block':'none';
+    // 展開時：自動捲到「你附近的那一站」(.here) 並置中，省得手動往下找
+    if(opening){
+      const li=ol.querySelector('li.here');
+      if(li){
+        const oRect=ol.getBoundingClientRect(),lRect=li.getBoundingClientRect();
+        ol.scrollTop += (lRect.top-oRect.top)-(ol.clientHeight/2-lRect.height/2);
+      }
+    }
   }));
 }
 
