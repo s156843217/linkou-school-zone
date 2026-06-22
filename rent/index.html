@@ -230,12 +230,12 @@
 <!-- 全站導覽列 -->
 <nav class="site-nav">
   <div class="nav-inner">
-    <a href="../home.html" class="nav-logo">林口置產工具箱</a>
+    <a href="../" class="nav-logo">林口置產工具箱</a>
     <div class="nav-links">
-      <a href="../index.html">學區快查</a>
-      <a href="../bus.html">公車路線</a>
-      <a href="../mortgage.html">房貸試算</a>
-      <a href="rent.html" class="active">租約產生器</a>
+      <a href="../school/">學區快查</a>
+      <a href="../bus/">公車路線</a>
+      <a href="../mortgage/">房貸試算</a>
+      <a href="../rent/" class="active">租約產生器</a>
     </div>
   </div>
 </nav>
@@ -280,7 +280,7 @@
     <!-- 1. 當事人 -->
     <section class="panel form-panel">
       <div class="module-title"><span class="dot"></span>當事人</div>
-      <div class="module-desc">出租人與承租人基本資料。每位下方可<strong>上傳／拍攝身分證</strong>自動帶入姓名、身分證字號、戶籍地址（影像僅在本機辨識、不上傳，結果為草稿須核對）。共有人或多名承租人請按「＋新增」加列。</div>
+      <div class="module-desc">出租人與承租人基本資料。共有人或多名承租人請按「＋新增」加列。</div>
 
       <label class="lbl" style="color:var(--teal-d);font-size:13.5px">出租人（甲方）</label>
       <div id="lessorList"></div>
@@ -710,14 +710,6 @@ function addParty(role, data){
       <div class="field"><label class="lbl">戶籍地址</label><input type="text" class="p-addr" ${idAttr('addr')} value="${esc(data.addr||'')}"></div>
       <div class="field sm"><label class="lbl">聯絡電話</label><input type="text" class="p-tel" ${idAttr('tel')} value="${esc(data.tel||'')}"></div>
       ${isFirst ? '' : `<button type="button" class="eq-rm party-rm" onclick="removeParty('${rid}')" title="移除此${cap}">×</button>`}
-    </div>
-    <div class="ocr-zone" ondragover="ocrDragOver(event,this)" ondragleave="ocrDragLeave(this)" ondrop="ocrDrop('${rid}',event,this)">
-      <label class="btn ghost sm ocr-btn">📷 掃描身分證（正／反面，可一次多選）
-        <input type="file" accept="image/*" multiple style="display:none" onchange="scanId('${rid}', event)">
-      </label>
-      <span class="ocr-status" id="ocrst_${rid}"></span>
-      <span class="ocr-hint">正面帶姓名、身分證字號；反面帶戶籍地址。上傳後會請你<strong>框選範圍</strong>（去黑邊／條碼／浮水印更準；想要姓名準，就把框縮到只罩住姓名那一列）。電腦可<strong>直接把照片拖曳到此區</strong>。首次需下載中文模型。</span>
-      <details class="ocr-raw" id="ocrraw_${rid}" style="display:none"><summary>辨識原文（核對 / 手動複製用）</summary><pre></pre></details>
     </div>`;
   list.appendChild(div);
 }

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../style.css">
 <script>
 /* 防同業以 iframe 內嵌冒用本工具（與學區頁一致） */
 (function(){
@@ -158,12 +158,12 @@
 <!-- 全站導覽列 -->
 <nav class="site-nav">
   <div class="nav-inner">
-    <a href="home.html" class="nav-logo">林口置產工具箱</a>
+    <a href="../" class="nav-logo">林口置產工具箱</a>
     <div class="nav-links">
-      <a href="index.html">學區快查</a>
-      <a href="bus.html" class="active">公車路線</a>
-      <a href="mortgage.html">房貸試算</a>
-      <a href="rent/rent.html">租約產生器</a>
+      <a href="../school/">學區快查</a>
+      <a href="../bus/" class="active">公車路線</a>
+      <a href="../mortgage/">房貸試算</a>
+      <a href="../rent/">租約產生器</a>
     </div>
   </div>
 </nav>
@@ -242,7 +242,7 @@
     <div class="agents">
       <div class="agent">
         <div class="top">
-          <img class="photo" src="img/agent-lee.png" alt="李天夏" loading="lazy" onerror="this.style.display='none'">
+          <img class="photo" src="../img/agent-lee.png" alt="李天夏" loading="lazy" onerror="this.style.display='none'">
           <div class="info">
             <div class="nm">李天夏</div>
             <div class="ph">📞 0936-123-288</div>
@@ -256,7 +256,7 @@
       </div>
       <div class="agent">
         <div class="top">
-          <img class="photo" src="img/agent-wen.png" alt="温美慈" loading="lazy" onerror="this.style.display='none'">
+          <img class="photo" src="../img/agent-wen.png" alt="温美慈" loading="lazy" onerror="this.style.display='none'">
           <div class="info">
             <div class="nm">温美慈</div>
             <div class="ph">📞 0976-109-326</div>
@@ -284,8 +284,8 @@
 <div class="toast" id="toast"></div>
 
 <!-- 資料：社區/門牌索引（沿用學區資料檔）＋ 公車資料 -->
-<script src="linkou-data.js"></script>
-<script src="bus-data.js"></script>
+<script src="../linkou-data.js"></script>
+<script src="../bus-data.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let toastT;
