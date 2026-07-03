@@ -1,118 +1,60 @@
-# CLAUDE.md — 專案規範
+# CLAUDE.md — my-project（網站開發主場・過渡期）
 
-> 這份檔案放在專案根目錄,Claude Code 啟動時會自動讀取。
-> 它是給 AI 的「專案說明書」,描述這個專案是什麼、怎麼寫、哪些規則要遵守。
-> 專案演進時請隨手更新這份檔案。
+> 通用守則（開工儀式、完成三級定義、紅線、commit 慣例）在全域 `~/.claude/CLAUDE.md`，先讀它。
+> 跨 repo SOP 在 `C:\repo\linkou-toolbox\docs\`（DEPLOY／CHECKLIST／DATA-UPDATE／DECISIONS）。
 
----
+## 1. 這個 repo 的身分（先搞清楚再動手）
 
-## 1. 專案概述
+- 這裡是「林口置產工具箱」整站的**開發主場**，但只到 **2026 年 7 月底收斂**為止；之後開發直接移到 `C:\repo\linkou-toolbox`，本 repo 退役為歷史檔庫。
+- ⚠ **remote 名稱陷阱**：remote 叫 `linkou-school-zone`，但那只是歷史沿革。日常開發一律在 **`dev` 分支**。
+- ⚠ **master 不是 dev 的上游**：`master` 是「學區獨立站」的單檔部署版（只有 3 個檔、CSS inline），與 dev 結構不同、歷史分叉。**不要自行 push master、不要自行 cherry-pick**——學區獨立站已停止內容更新（7 月底改跳轉頁）。
+- 改動要上線 = 同步到 linkou-toolbox，照 `docs/DEPLOY.md` 第 2 節，用 `tools/sync-toolbox.ps1`。
 
-這是一個**個人網站專案**,目前處於第一階段。
-
-**最終目標**:打造一個屬於我個人的網站,包含:
-- 個人資訊頁
-- 文章發佈(部落格)
-- 工具集(目前已有「林口學區快查」,未來會擴充)
-
-**未來規劃中的工具**:
-- 薪資試算 → 推算可負擔的購屋預算
-- 房貸 / 購屋試算
-- 稅務試算
-
-**目前已完成(第一階段)**:
-- 「林口學區快查」單頁工具:輸入地址或社區名,查出所屬的里、鄰,以及對應的國小 / 國中學區,並在地圖上標示。同時提供幼兒園名額、額滿學校設籍日等參考資訊。
-- 此工具同時作為一家房仲(太平洋房屋・林口捷運加盟店)的客戶服務工具,頁面底部有真實的營業員聯絡資訊。
-
----
-
-## 2. 技術棧
-
-- **純前端**:HTML + CSS + 原生 JavaScript,**沒有使用任何框架**(無 React / Vue 等)。
-- **無建置流程**:不需要 npm build、不需要打包工具。直接用瀏覽器開 `index.html` 即可執行。
-- **外部函式庫(全部用 CDN 載入,不安裝於本地)**:
-  - Leaflet 1.9.4 — 地圖顯示
-  - Google Fonts(Noto Sans TC / Noto Serif TC)— 字型
-- **外部服務**:
-  - OpenStreetMap 圖磚 — 地圖底圖
-  - Nominatim(`nominatim.openstreetmap.org`)— 地址 / 社區的線上地理編碼
-- **語言 / 地區**:介面全為繁體中文(`lang="zh-Hant"`),資料以新北市林口區為主。
-
----
-
-## 3. 檔案結構與核心架構原則 ⭐
+## 2. 檔案結構
 
 ```
-專案根目錄/
-├── index.html        ← 介面 (HTML)、樣式 (<style>)、主要邏輯 (<script>) 都在這
-├── linkou-data.js    ← 所有「會變動的資料」集中於此
-└── CLAUDE.md         ← 本檔
+index.html          整合站首頁（工具卡＋導覽）
+school/index.html   學區快查（邏輯）   ←資料→ linkou-data.js（根目錄）
+mortgage/index.html 房貸試算           ←資料→ mortgage-data.js
+rent/index.html     租約產生器         ←資料→ rent/rent-data.js
+bus/index.html      公車路線           ←資料→ bus-data.js ＋ linkou-data.js
+style.css           全站共用樣式（:root CSS 變數＝設計系統）
+tools/              開發工具：selftest.html（資料自檢）、sync-toolbox.ps1（同步）、fetch-bus.ps1
+HANDOFF.md          租約產生器的交接筆記（做租約相關工作先讀）
+reference/ price_data/ rent/reference/ tdx-secret.json  ← 本機資料，已 gitignore，永不 commit
 ```
 
-**最重要的架構原則:資料與邏輯分離。**
-- **要改資料**(學校、社區、里界、幼兒園名額、額滿清單等)→ **只改 `linkou-data.js`**,不要動 `index.html` 的邏輯。
-- **要改功能 / 介面 / 演算法** → 改 `index.html`。
+## 3. 路由表：做某類事之前，先讀什麼
 
-`linkou-data.js` 內主要的資料物件(改資料時對照):
-- `SCHOOLS` — 各校地址 / 電話 / 網站
-- `COMMUNITY` — 社區 → 里 對照名單(最大宗)
-- `LI` — 各里 → 國小 / 國中學區規則
-- `INFO` — 各校亮點 / 介紹話術
-- `FULL_ES` / `CITY_FREE_ES` — 額滿國小 / 全市自由學區國小
-- `FULL_DATA` — 額滿學校歷年最後設籍日
-- `KG_PUBLIC` / `KG_PRIVATE` — 公立(非營利)/ 私立幼兒園資料
-- `LK_GEO` — 各里界線(GeoJSON)
-- `ALIASES` — 社區俗稱字典(別名 → 官方報備名)
+| 任務 | 先讀 |
+|---|---|
+| 新增/修改社區、學校、幼兒園等資料 | `linkou-toolbox/docs/DATA-UPDATE.md`（含物件對照與格式範例） |
+| 改完要驗證 | `linkou-toolbox/docs/CHECKLIST.md` ＋ 開 `tools/selftest.html` |
+| 要上線／同步到整合站 | `linkou-toolbox/docs/DEPLOY.md` 第 2 節 |
+| 改租約產生器 | 本 repo `HANDOFF.md`（分批待辦與踩雷都在裡面） |
+| 改房貸試算 | `mortgage-data.js` 地段數字是自動更新流入的，先讀 DEPLOY.md 第 3 節 |
+| 115 學年學區切換 | `DATA-UPDATE.md` 第 4 節＋memory `linkou-115-switch-plan`（鐵則：沒有里鄰對照表不准動） |
+| 關獨立站／收斂搬家 | `DEPLOY.md` 第 4 節 runbook |
+| 不確定某事是否已有定論 | `linkou-toolbox/docs/DECISIONS.md` |
 
-> 修改任何資料前,先確認是否屬於上述物件;能在 `linkou-data.js` 解決的,就不要改 `index.html`。
+## 4. 核心原則
 
----
+1. **資料與邏輯分離**：改資料只動 `*-data.js`，不碰各頁 `index.html`；能在資料檔解決的就不要改邏輯。
+2. **純前端、零建置、無框架**：瀏覽器直接開 `file://` 即可執行，這是驗證的唯一方式（本機無 Node/Python）。不引入需要編譯打包的東西。
+3. **設計系統**：沿用 `style.css` `:root` 變數（主色陶土橘 `--clay`、輔色墨綠 `--teal`、背景米色 `--bg`；標題 `--serif`＝Noto Serif TC、內文 `--sans`＝Noto Sans TC）與既有 class（`.panel` 卡片、`.btn` 按鈕、`.site-nav` 導覽）。不硬寫色碼、不另寫一套樣式。
+4. **註解用繁體中文**，密度比照既有程式；新程式以可讀性優先，不刻意壓單行。慣用 `const $ = s => document.querySelector(s);`。
+5. 核心演算法動前先讀懂：地址解析 `parseHouse`／`houseLookup`、里界判定 `liAtPoint`（點在多邊形內）。改壞這些＝整個學區工具查錯。
 
-## 4. 程式碼風格慣例
+## 5. 本 repo 專屬紅線（全域紅線之外）
 
-- **註解用繁體中文**,且現有程式碼註解相當完整 — 新增邏輯時請比照,加上清楚的中文註解。
-- JS 寫法偏精簡(部分單行密集寫法)。新增程式時以**可讀性優先**,不必刻意壓成單行。
-- 慣用簡寫:`const $ = s => document.querySelector(s);`(以 `$("#id")` 取元素)。
-- CSS 全部寫在 `index.html` 的 `<style>` 內,使用 CSS 變數(見下節),不要硬寫色碼。
-- 縮排與既有檔案保持一致。
+- `rent/reference/`（真實租約個資）、`reference/`（官方原始檔）、`price_data/`（430MB 實價原始檔）、`tdx-secret.json`（TDX 金鑰）、根目錄 `*.xlsx`（門牌原始檔）：**已 gitignore，永不 commit、內容不貼進會公開的檔案**。
+- 頁尾營業員資訊、學區免責提醒（`.disc`）、租約法定條文：不刪、不改、不亂填。
+- Nominatim 呼叫必須保留 350–900ms 節流。
+- 學區資料改完必跑 `tools/selftest.html`；別忘了資料有三份複本要傳播（toolbox、LINE bot），見 `DATA-UPDATE.md` 第 2 節第 5 步。
 
----
+## 6. 擴充新工具時
 
-## 5. 設計系統(擴充新頁面時務必沿用)
-
-為了讓未來新增的頁面(個人頁、文章、試算工具)風格一致,請沿用既有的設計語言。色彩與字型定義在 `index.html` 的 `:root` CSS 變數:
-
-- **色系**:暖色調大地色 — 主色陶土橘 `--clay`、輔色墨綠 `--teal`、點綴琥珀金 `--amber` / `--gold`;背景米色 `--bg`。
-- **字型**:標題用襯線 `--serif`(Noto Serif TC),內文用無襯線 `--sans`(Noto Sans TC)。
-- **元件**:卡片用 `.panel`(白底、圓角、柔和陰影 `--shadow`);按鈕用 `.btn`(及 `.btn.ghost` 等變體)。
-- 新增 UI 時,**優先重用現有的 class 與 CSS 變數**,而非另寫一套樣式,以維持整站視覺一致。
-
----
-
-## 6. 注意事項與禁區
-
-- **Nominatim 流量限制**:線上地理編碼有使用限制,現有程式已用 `setTimeout` 延遲(如每次查詢間隔約 350–900ms)來尊重限制。新增會呼叫 Nominatim 的功能時,務必維持節流,不要短時間大量請求。
-- **真實營業資訊**:頁面底部的營業員姓名、電話、LINE、證照字號為**真實資料**。除非明確指示,不要更動或在範例中亂填這些欄位。
-- **學區資料具時效性**:資料依「114 學年度」整理,新北市 115 學年度起里鄰可能重新編號、學區可能調整。頁面已有對應的提醒區塊(`.disc`),修改資料時請留意此情境,不要移除免責提醒。
-- **不要破壞既有查詢邏輯**:地址解析(`parseHouse` / `houseLookup`)、里界判定(`liAtPoint` / 點在多邊形內判斷)是核心,改動前先理解清楚。
-- 維持「直接開檔即可執行、零建置」的特性 — 除非有明確需求並經討論,不要引入需要編譯 / 打包的工具鏈。
-
----
-
-## 7. 擴充新功能時的建議做法
-
-當要新增頁面或工具(例如薪資試算、稅務試算、文章頁)時:
-
-1. **沿用第 5 節的設計系統**(色彩、字型、`.panel`、`.btn`),讓新頁面與現有頁面視覺一致。
-2. **延續資料 / 邏輯分離原則**:新工具若有大量資料或設定,比照 `linkou-data.js` 的做法,獨立成自己的資料檔(例如 `tax-data.js`),邏輯與資料分開。
-3. **試算類工具**(薪資 / 購屋 / 稅務)屬於數字計算,請把計算公式寫清楚、加上中文註解,並標註資料 / 稅率的依據年度與來源(比照學區工具標註資料來源的做法)。
-4. **隨專案成長重新檢視結構**:目前是單頁 + 單一資料檔。當頁面變多(個人頁、文章、多個試算工具)時,可以一起討論是否要拆成多個 HTML 頁面、共用一份 CSS,或建立簡單的導覽列。屆時再評估,現階段維持簡單即可。
-5. 每完成一個階段,記得用 Git 建立一個 commit 存檔點。
-
----
-
-## 8. 給 Claude 的協作提醒
-
-- 回應與註解請用**繁體中文**。
-- 改動前若涉及核心邏輯或資料結構,先簡述你打算怎麼做再動手。
-- 不確定某筆資料屬於哪個物件、或某段邏輯的用途時,先問,不要憑猜測改動。
+1. 沿用設計系統與導覽列；資料獨立成自己的 `xxx-data.js`。
+2. 核心計算寫成**不碰畫面的純函式**（未來可能接 LINE bot 重用，比照 `school-logic.js` 的做法）。
+3. 試算類工具把公式寫清楚＋中文註解＋標註資料/稅率的年度與來源。
+4. 每完成一個階段就 commit（commit 即存檔，小事不必另寫 md；多步驟計畫與踩雷才寫 HANDOFF）。

@@ -14,3 +14,6 @@ tdx-secret.json
 .DS_Store
 Thumbs.db
 *~
+
+# 門牌原始資料檔(xlsx,HOUSE 重建用)— 大型二進位,僅本機使用
+*.xlsx
