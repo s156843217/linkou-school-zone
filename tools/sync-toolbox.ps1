@@ -26,7 +26,8 @@ $files = @(
     "index.html",
     "style.css",
     "linkou-data.js",
-    "mortgage-data.js",
+    # mortgage-data.js 不在白名單：2026-07-03 起真相來源在 toolbox（每月 Actions 自動更新地段/三類行情），
+    # 從 dev 蓋過去會弄丟新數字。要手改它請直接改 toolbox 那份，再複製回 dev。
     "bus-data.js",
     "school/index.html",
     "mortgage/index.html",
@@ -57,13 +58,6 @@ Write-Host "===== 同步差異報告（dev → toolbox）====="
 Write-Host ("相同：{0} 檔" -f $sameCount) -ForegroundColor Green
 foreach ($f in $diff)    { Write-Host ("內容不同：{0}" -f $f) -ForegroundColor Yellow }
 foreach ($f in $missing) { Write-Host ("toolbox 缺少：{0}" -f $f) -ForegroundColor Yellow }
-if ($diff -contains "mortgage-data.js") {
-    Write-Host ""
-    Write-Host "⚠ mortgage-data.js 有差異——注意：LINKOU_ZONES 地段數字的真相來源是" -ForegroundColor Red
-    Write-Host "  linkou-mortgage repo（每月自動更新）。先確認你不是要拿舊數字蓋掉新數字！" -ForegroundColor Red
-    Write-Host "  （流向說明：C:\repo\linkou-toolbox\docs\DEPLOY.md 第 3 節）" -ForegroundColor Red
-}
-
 if (($diff.Count + $missing.Count) -eq 0) {
     Write-Host ""; Write-Host "兩邊一致，不需要同步。" -ForegroundColor Green
     exit 0
