@@ -33,7 +33,12 @@ $files = @(
     "mortgage/index.html",
     "rent/index.html",
     "rent/rent-data.js",
-    "bus/index.html"
+    "bus/index.html",
+    "report/index.html",
+    "report/qrcode.js",
+    "share/index.html",
+    "report-logic.js",
+    "internal-nav.js"
 )
 # img/ 底下的圖片也同步，但排除開發用的 crop-tool.html
 $imgFiles = Get-ChildItem -Path (Join-Path $src "img") -Recurse -File |
