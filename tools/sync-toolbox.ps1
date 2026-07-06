@@ -90,4 +90,4 @@ Write-Host "複製完成。接下來（照 docs/DEPLOY.md 第 2 節）：" -Fore
 Write-Host "  1. cd C:\repo\linkou-toolbox"
 Write-Host "  2. git diff        ← 肉眼再確認一次"
 Write-Host "  3. git add -A ; git commit -m ""(沿用 dev 的 commit 訊息)"" ; git push"
-Write-Host "  4. 一分鐘後開 https://s156843217.github.io/linkou-toolbox/ 驗證"
+Write-Host "  4. 一分鐘後開 https://swcasa.com/ 驗證"
