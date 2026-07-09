@@ -122,6 +122,10 @@ if(location.protocol==='https:'){
     background:#fff;cursor:pointer;color:var(--ink-soft);transition:.15s;font-family:var(--sans)}
   .zt:hover{border-color:var(--clay)}
   .zt.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  /* 圖層色對照：國小=陶土橘、國中=墨綠、里界=琥珀。膠囊前的小色點＋選中時膠囊變同色 */
+  .zt .zdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .zt.on[data-zone="jh"]{background:var(--teal);border-color:var(--teal)}
+  .zt.on[data-zone="li"]{background:var(--amber);border-color:var(--amber)}
   /* 地圖工具列：選學校看學區範圍的下拉（沿用膠囊外觀） */
   .zt-pick{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:999px;border:1.5px solid var(--line);
     background:#fff;cursor:pointer;color:var(--ink);font-family:var(--sans)}
@@ -358,9 +362,9 @@ if(location.protocol==='https:'){
     <div>
       <div class="map-toggle">
         <span class="mt-label">地圖範圍</span>
-        <button class="zt on" data-zone="es">國小學區</button>
-        <button class="zt" data-zone="jh">國中學區</button>
-        <button class="zt" data-zone="li">里界</button>
+        <button class="zt on" data-zone="es"><span class="zdot" style="background:var(--clay)"></span>國小學區</button>
+        <button class="zt" data-zone="jh"><span class="zdot" style="background:var(--teal)"></span>國中學區</button>
+        <button class="zt" data-zone="li"><span class="zdot" style="background:var(--amber)"></span>里界</button>
         <select class="zt-pick" id="schoolPick" title="先選上方「國小學區／國中學區」，再從這裡挑學校看範圍">
           <option value="">🏫 選學校看範圍…</option>
         </select>
@@ -488,7 +492,7 @@ let lastResult=null;
 function pointInRing(x,y,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
 function pointInFeature(lon,lat,geom){const polys=geom.type==='Polygon'?[geom.coordinates]:geom.coordinates;for(const poly of polys){if(pointInRing(lon,lat,poly[0])){let hole=false;for(let h=1;h<poly.length;h++){if(pointInRing(lon,lat,poly[h])){hole=true;break;}}if(!hole)return true;}}return false;}
 function liAtPoint(lat,lon){for(const f of LK_GEO.features){if(pointInFeature(lon,lat,f.geometry))return f.properties.li;}return null;}
-function drawLi(name){if(liLayer){map.removeLayer(liLayer);liLayer=null;}const f=LK_GEO.features.find(x=>x.properties.li===name);if(!f)return;liLayer=L.geoJSON(f,{style:{color:'#BD5E39',weight:2,fillColor:'#BD5E39',fillOpacity:.10}}).addTo(map);}
+function drawLi(name){if(liLayer){map.removeLayer(liLayer);liLayer=null;}const f=LK_GEO.features.find(x=>x.properties.li===name);if(!f)return;liLayer=L.geoJSON(f,{style:{color:'#C2902B',weight:2,fillColor:'#C2902B',fillOpacity:.10}}).addTo(map);}   /* 里界一律琥珀色，與國小(橘)/國中(綠)區隔 */
 /* 把地圖移到目前框圖層範圍 */
 function fitToLayer(){if(liLayer){try{map.fitBounds(liLayer.getBounds(),{padding:[40,40],maxZoom:16});}catch(e){}}}
 function focusLi(name){const f=LK_GEO.features.find(x=>x.properties.li===name);if(!f)return;try{const lyr=L.geoJSON(f);map.fitBounds(lyr.getBounds(),{padding:[40,40],maxZoom:16});}catch(e){}}
@@ -504,9 +508,9 @@ function drawZone(fit){
     const {group}=buildSchoolZoneLayer(school,mapZone);
     if(group.getLayers().length){ group.addTo(map); liLayer=group; if(fit)fitToLayer(); return; }
   }
-  // 里界，或（自由學區／未指定鄰，無單一基本學校時）退回顯示所在里
+  // 里界，或（自由學區／未指定鄰，無單一基本學校時）退回顯示所在里——畫的是里界就用琥珀色
   if(zoneCtx.li){
-    const color=mapZone==='jh'?'#3C7A62':'#BD5E39';
+    const color='#C2902B';
     const g=LK_GEO.features.find(x=>x.properties.li===zoneCtx.li);
     if(g){ liLayer=L.geoJSON(g,{style:{color,weight:2.5,fillColor:color,fillOpacity:.10}}).addTo(map);
            liLayer.bindTooltip(zoneCtx.li,{permanent:false,direction:'center',className:'zone-tip'}); if(fit)fitToLayer(); }
