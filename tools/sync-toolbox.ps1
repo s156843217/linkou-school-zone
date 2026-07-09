@@ -38,7 +38,8 @@ $files = @(
     "report/qrcode.js",
     "share/index.html",
     "report-logic.js",
-    "internal-nav.js"
+    "internal-nav.js",
+    "about/index.html"
 )
 # img/ 底下的圖片也同步，但排除開發用的 crop-tool.html
 $imgFiles = Get-ChildItem -Path (Join-Path $src "img") -Recurse -File |
