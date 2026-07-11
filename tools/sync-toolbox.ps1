@@ -30,6 +30,8 @@ $files = @(
     # 從 dev 蓋過去會弄丟新數字。要手改它請直接改 toolbox 那份，再複製回 dev。
     "bus-data.js",
     "school/index.html",
+    # price-list-data.js 不在白名單：真相來源在 toolbox（每月 Actions 自動更新），同 mortgage-data.js
+    "price/index.html",
     "mortgage/index.html",
     "rent/index.html",
     "rent/rent-data.js",
