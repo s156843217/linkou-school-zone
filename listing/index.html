@@ -62,10 +62,10 @@
   .mini{font-size:12.5px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;background:none;border:none;font-family:inherit;padding:0}
 
   /* ── 結果表 ── */
-  .sumline{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
-  .sum{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 16px;box-shadow:var(--shadow)}
-  .sum .k{font-size:12px;color:var(--ink-soft)}
-  .sum .v{font-size:19px;font-weight:900;color:var(--clay)}
+  .sumline{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+  .sum{flex:1 1 160px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:15px 20px;box-shadow:var(--shadow)}
+  .sum .k{font-size:12.5px;color:var(--ink-soft);margin-bottom:4px}
+  .sum .v{font-size:26px;font-weight:900;color:var(--clay);line-height:1.15}
   .sum .v small{font-size:12px;font-weight:400;color:var(--ink-soft)}
   .tbl-wrap{overflow-x:auto;background:#fff;border-radius:12px;box-shadow:var(--shadow);margin-bottom:8px}
   table.ct{width:100%;border-collapse:collapse;min-width:640px}
@@ -91,7 +91,12 @@
     body{background:#fff}
     .wrap{max-width:none;padding:0}
     .tbl-wrap{box-shadow:none;border:1px solid #ccc}
-    .sum{box-shadow:none;border:1px solid #ccc}
+    /* 刊登連結欄是超連結，紙本點不了，列印時整欄隱藏 */
+    .col-link{display:none !important}
+    /* 摘要卡印出來也要醒目：加大數字、明顯外框 */
+    .sumline{gap:8px}
+    .sum{box-shadow:none;border:1.5px solid #999;padding:12px 18px}
+    .sum .v{font-size:23px}
   }
 </style>
 </head>
@@ -184,6 +189,12 @@
     <div class="sumline" id="sumBox"></div>
 
     <h2 class="sec-title"><span class="bar"></span><span id="mineTitle"></span></h2>
+    <div class="pills no-print" id="sortPills">
+      <span class="hint" style="margin:0;align-self:center">排序：</span>
+      <button class="pill on" data-s="unit">單價</button>
+      <button class="pill" data-s="price">總價</button>
+      <button class="pill" data-s="floor">樓層</button>
+    </div>
     <div id="mineList"></div>
 
     <div id="nearSec2" style="display:none">
@@ -310,6 +321,13 @@ document.querySelectorAll('#radiusPills .pill').forEach(b => b.addEventListener(
   if (SEL){ buildSources(); render(); }
 }));
 
+/* 排序切換：單價／總價／樓層 */
+document.querySelectorAll('#sortPills .pill').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#sortPills .pill').forEach(x => x.classList.toggle('on', x === b));
+  sortMode = b.dataset.s;
+  if (SEL) render();
+}));
+
 /* ── 貼上（同測試頁機制：累加＋去重） ── */
 document.addEventListener('paste', e => {
   if (!SEL) return;
@@ -350,7 +368,14 @@ $('#resetBtn').addEventListener('click', () => {
 
 /* ── 分組＋畫面 ── */
 const fmtW = n => Math.round(n).toLocaleString('zh-TW');
-const sortU = (a, b) => (a.unit === null) - (b.unit === null) || a.unit - b.unit;
+/* 排序：單價 / 總價 / 樓層，皆由低到高，抓不到值的殿後 */
+let sortMode = 'unit';
+function sortKey(g){
+  if (sortMode === 'price') return g.minPrice;
+  if (sortMode === 'floor') return g.floor ? parseInt(g.floor, 10) : null;
+  return g.unit;
+}
+const cmpSort = (a, b) => { const va = sortKey(a), vb = sortKey(b); return (va === null) - (vb === null) || va - vb; };
 
 function classify(){
   const mine = [], near = [], unk = [];
@@ -375,28 +400,28 @@ function rowsHTML(groups, withComm){
       <td>${g.layout ? esc(g.layout) : '<span class="miss">—</span>'}</td>
       <td class="num">${g.minPrice !== null ? fmtW(g.minPrice) + (g.count > 1 ? '<span class="badge-n">' + g.count + ' 家刊登</span>' : '') : '<span class="miss">—</span>'}</td>
       <td class="num">${g.unit !== null ? g.unit.toFixed(1) : '<span class="miss">—</span>'}</td>
-      <td>${links}</td>
+      <td class="col-link">${links}</td>
     </tr>`;
   }).join('');
 }
 function meRowHTML(myUnit){
   return `<tr class="me">
-    <td class="num">${MY.floor ? MY.floor + 'F' : '—'}</td>
+    <td class="num"><span class="me-tag">本案</span> ${MY.floor ? MY.floor + 'F' : '—'}</td>
     <td class="num">${MY.size !== null ? MY.size + '坪' : '—'}</td>
     <td class="num">—</td><td>—</td>
     <td class="num">${MY.price !== null ? fmtW(MY.price) : '—'}</td>
     <td class="num">${myUnit !== null ? myUnit.toFixed(1) : '—'}</td>
-    <td><span class="me-tag">本案</span></td>
+    <td class="col-link"></td>
   </tr>`;
 }
-const TH_MINE = '<tr><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th>刊登連結</th></tr>';
-const TH_NEAR = '<tr><th>社區</th><th>距離</th><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th>刊登連結</th></tr>';
+const TH_MINE = '<tr><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th></tr>';
+const TH_NEAR = '<tr><th>社區</th><th>距離</th><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th></tr>';
 
 function render(){
   if (!SEL || !ALL.size){ $('#resSec').style.display = 'none'; $('#pasteStat').textContent = ''; return; }
   const { mine, near, unk } = classify();
-  const gm = groupUnits591(mine).sort(sortU);
-  const gn = groupUnits591(near).sort(sortU);
+  const gm = groupUnits591(mine).sort(cmpSort);
+  const gn = groupUnits591(near).sort(cmpSort);
   $('#pasteStat').textContent = `已貼 ${pasteCount} 次｜累計 ${ALL.size} 筆刊登 → 本社區 ${mine.length} 筆（歸戶後 ${gm.length} 戶）｜鄰近 ${near.length} 筆｜無法歸類 ${unk.length} 筆`;
   $('#resSec').style.display = 'block';
 
@@ -418,9 +443,11 @@ function render(){
   /* 本社區表：有填本案才插「本案」列；有單價就照排序位置插，沒單價就置頂 */
   $('#mineTitle').textContent = `「${SEL}」同社區在售`;
   const hasMy = MY.floor !== null || MY.size !== null || MY.price !== null;
+  const myVal = sortMode === 'price' ? MY.price : sortMode === 'floor' ? MY.floor : myUnit;
   let mineRows = '', inserted = !hasMy;
   for (const g of gm){
-    if (!inserted && (myUnit === null || g.unit === null || g.unit >= myUnit)){ mineRows += meRowHTML(myUnit); inserted = true; }
+    const gv = sortKey(g);
+    if (!inserted && (myVal === null || gv === null || gv >= myVal)){ mineRows += meRowHTML(myUnit); inserted = true; }
     mineRows += rowsHTML([g], false);
   }
   if (!inserted) mineRows += meRowHTML(myUnit);
