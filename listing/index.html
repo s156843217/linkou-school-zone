@@ -49,8 +49,15 @@
   .pills{display:flex;gap:8px;margin-top:10px}
   .pill{padding:6px 14px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit}
   .pill.on{background:var(--teal);border-color:var(--teal);color:#fff}
-  #zone{margin:14px 0 6px;padding:30px 16px;border:2px dashed var(--clay);border-radius:12px;text-align:center;color:var(--clay);font-size:15px;background:#fff;cursor:pointer}
-  #zone.got{border-color:var(--teal);color:var(--teal)}
+  #zone{margin:14px 0 6px;padding:34px 16px;border:2.5px dashed var(--clay);border-radius:14px;text-align:center;
+    color:var(--clay);font-size:19px;font-weight:700;background:#FFF9F2;cursor:pointer;outline:none;transition:box-shadow .2s,background .2s}
+  #zone:focus,#zone:hover{background:#FFF3E5}
+  #zone .zone-sub{display:block;margin-top:8px;font-size:12.5px;font-weight:400;color:var(--ink-soft)}
+  #zone.got{border-color:var(--teal);color:var(--teal);background:#F0F7F3}
+  #zone.flash{animation:zoneFlash 1.2s ease}
+  @keyframes zoneFlash{0%,100%{box-shadow:0 0 0 0 rgba(189,94,57,0)}30%{box-shadow:0 0 0 6px rgba(189,94,57,.28)}}
+  .near-box{margin:10px 0;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px}
+  .near-box summary{cursor:pointer;padding:11px 0;font-weight:700;font-size:13.5px;color:var(--teal)}
   #pasteStat{font-size:13.5px;font-weight:700;margin:6px 2px;color:var(--ink-soft)}
   .mini{font-size:12.5px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;background:none;border:none;font-family:inherit;padding:0}
 
@@ -153,16 +160,19 @@
     </details>
     <div class="src-links">
       <a class="btn" id="openMine" href="#" target="_blank" rel="noopener">開 591</a>
-      <span class="hint" style="margin:0">→ 在 591 清單頁點<b>「📌 591 快抓」書籤</b>（或 <b>Ctrl+A</b> 全選複製）→ 回本頁 <b>Ctrl+V</b> 貼上；多頁就翻頁重點一次，會自動累加去重。</span>
+      <span class="hint" style="margin:0">→ 在 591 清單頁點<b>「📌 591 快抓」書籤</b>（或 <b>Ctrl+A</b> 全選複製），再回這裡貼上 👇</span>
     </div>
-    <div class="near-list" id="nearBox"></div>
-    <div class="pills" id="radiusPills">
-      <span class="hint" style="margin:0;align-self:center">鄰近範圍：</span>
-      <button class="pill on" data-r="300">300 公尺</button>
-      <button class="pill" data-r="500">500 公尺</button>
-    </div>
-    <div id="zone">點一下這裡，然後 Ctrl+V 貼上 591 頁面</div>
+    <div id="zone" tabindex="0">👉 回到這裡，直接按 <b>Ctrl</b>＋<b>V</b> 貼上<span class="zone-sub">從 591 複製好之後就貼在這個框；多頁就翻頁再點書籤、再貼一次，會自動累加去重。</span></div>
     <div id="pasteStat"></div>
+    <details class="near-box" id="nearDetails">
+      <summary id="nearSummary">🔍 在售太少？加查鄰近社區</summary>
+      <div class="pills" id="radiusPills">
+        <span class="hint" style="margin:0;align-self:center">鄰近範圍：</span>
+        <button class="pill on" data-r="300">300 公尺</button>
+        <button class="pill" data-r="500">500 公尺</button>
+      </div>
+      <div class="near-list" id="nearBox"></div>
+    </details>
     <div>
       <button class="mini" id="dlRaw" style="display:none">下載原始樣本（解析有誤時交給開發端）</button>
       <button class="mini" id="resetBtn" style="display:none;margin-left:14px">清空重來</button>
@@ -288,6 +298,7 @@ function buildSources(){
   $('#openMine').href = s591(SEL);
   $('#openMine').textContent = `🔗 開 591 搜「${SEL}」`;
   NEAR = nearby591(SEL, RADIUS).slice(0, 10).map(o => ({ ...o, stats: commStats591(o.name) }));
+  $('#nearSummary').textContent = `🔍 在售太少？加查鄰近社區（${RADIUS} 公尺內 ${NEAR.length} 個）`;
   $('#nearBox').innerHTML = NEAR.length
     ? `<div class="hint" style="margin:4px 2px">在售太少時，可加查 ${RADIUS} 公尺內這些社區（點連結→複製→回來貼，會自動標成「鄰近競品」）：</div>`
       + NEAR.map(o => `<div class="near-row"><span class="nm">${esc(o.name)}</span><span class="meta">${o.dist}m｜${statTxt(o.stats)}</span><a href="${s591(o.name)}" target="_blank" rel="noopener">開 591 ↗</a></div>`).join('')
@@ -461,6 +472,15 @@ function render(){
 }
 
 $('#printBtn').addEventListener('click', () => window.print());
+
+/* 從 591 分頁切回本頁時，自動把貼上框捲到眼前並閃一下，省得使用者找。 */
+function flashZone(){
+  const z = $('#zone'); if (!z || !SEL) return;
+  const r = z.getBoundingClientRect();
+  if (r.top < 60 || r.bottom > innerHeight) z.scrollIntoView({ behavior:'smooth', block:'center' });
+  z.classList.remove('flash'); void z.offsetWidth; z.classList.add('flash');
+}
+window.addEventListener('focus', flashZone);
 
 /* ── 快抓書籤：這個函式的原始碼會被轉成 bookmarklet 掛到安裝按鈕上 ──
    在 591 清單頁執行：讀整頁 HTML → 加 LK591HTML 記號放進剪貼簿 → 提示回本頁貼上。
