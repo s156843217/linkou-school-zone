@@ -77,6 +77,14 @@
   .ct .miss{color:#b6a898}
   .badge-n{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:var(--teal);color:#fff;font-size:11px;font-weight:700}
   .me-tag{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--clay);color:#fff;font-size:11.5px;font-weight:700}
+  .table-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:8px 0}
+  .del-tools{display:flex;align-items:center;gap:10px}
+  .btn.sm{padding:5px 12px;font-size:13px}
+  .col-check,.col-del{width:34px;text-align:center;padding-left:6px;padding-right:6px}
+  .col-check input{width:16px;height:16px;cursor:pointer}
+  .btn-del{border:none;background:none;color:#b6a898;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;font-family:inherit}
+  .btn-del:hover{color:var(--red)}
+  .ct tr.dimmed{opacity:.4}
   .unk-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:8px 10px;border-bottom:1px solid var(--bg2);font-size:13.5px;background:#fff}
   .deal{background:#EAF3EE;border:1px solid #CBE2D4;border-radius:12px;padding:12px 16px;font-size:14px;line-height:1.8;margin:12px 0}
 
@@ -189,11 +197,17 @@
     <div class="sumline" id="sumBox"></div>
 
     <h2 class="sec-title"><span class="bar"></span><span id="mineTitle"></span></h2>
-    <div class="pills no-print" id="sortPills">
-      <span class="hint" style="margin:0;align-self:center">排序：</span>
-      <button class="pill on" data-s="unit">單價</button>
-      <button class="pill" data-s="price">總價</button>
-      <button class="pill" data-s="floor">樓層</button>
+    <div class="table-tools no-print">
+      <div class="pills" id="sortPills">
+        <span class="hint" style="margin:0;align-self:center">排序：</span>
+        <button class="pill on" data-s="unit">單價</button>
+        <button class="pill" data-s="price">總價</button>
+        <button class="pill" data-s="floor">樓層</button>
+      </div>
+      <div class="del-tools">
+        <button class="btn ghost sm" id="delChecked">🗑 刪除勾選</button>
+        <span id="exNote" class="hint" style="margin:0"></span>
+      </div>
     </div>
     <div id="mineList"></div>
 
@@ -241,6 +255,7 @@ let RADIUS = 300;
 let NEAR = [];                // 鄰近社區建議 [{name,dist,stats}]
 const ALL = new Map();        // 物件編號 → 解析結果（跨多次貼上累積）
 const INCLUDED = new Set();   // 「無法歸類」中被手動併入比較的物件編號
+const EXCLUDED = new Set();   // 使用者手動剔除的物件編號（疑似已成交沒撤廣告等）
 const rawPastes = [];
 let pasteCount = 0;
 
@@ -328,6 +343,20 @@ document.querySelectorAll('#sortPills .pill').forEach(b => b.addEventListener('c
   if (SEL) render();
 }));
 
+/* 剔除疑似已成交（沒撤廣告）的物件：勾選批次刪、單筆✕刪、可全部復原 */
+$('#delChecked').addEventListener('click', () => {
+  const chks = document.querySelectorAll('.rowchk:checked');
+  if (!chks.length){ alert('請先勾選要剔除的列（左側的方框）'); return; }
+  chks.forEach(c => c.dataset.ids.split(',').forEach(id => EXCLUDED.add(id)));
+  render();
+});
+document.addEventListener('click', e => {
+  const d = e.target.closest('.btn-del');
+  if (d){ e.preventDefault(); d.dataset.del.split(',').forEach(id => EXCLUDED.add(id)); render(); return; }
+  const r = e.target.closest('.restore-ex');
+  if (r){ e.preventDefault(); EXCLUDED.clear(); render(); }
+});
+
 /* ── 貼上（同測試頁機制：累加＋去重） ── */
 document.addEventListener('paste', e => {
   if (!SEL) return;
@@ -360,7 +389,7 @@ $('#dlRaw').addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 $('#resetBtn').addEventListener('click', () => {
-  ALL.clear(); INCLUDED.clear(); rawPastes.length = 0; pasteCount = 0;
+  ALL.clear(); INCLUDED.clear(); EXCLUDED.clear(); rawPastes.length = 0; pasteCount = 0;
   $('#zone').classList.remove('got');
   $('#zone').textContent = '點一下這裡，然後 Ctrl+V 貼上 591 頁面';
   render();
@@ -380,6 +409,7 @@ const cmpSort = (a, b) => { const va = sortKey(a), vb = sortKey(b); return (va =
 function classify(){
   const mine = [], near = [], unk = [];
   for (const it of ALL.values()){
+    if (EXCLUDED.has(it.id)) continue;   // 使用者手動剔除的不進任何表、也不計入統計
     if (isMine591(it, SEL)){ mine.push(it); continue; }
     it._comm = resolveComm591(it.community);
     it._dist = it._comm ? commDist591(SEL, it._comm) : null;
@@ -392,7 +422,9 @@ function classify(){
 function rowsHTML(groups, withComm){
   return groups.map(g => {
     const links = g.listings.map((l, i) => `<a href="${l.url}" target="_blank" rel="noopener" title="${esc(l.title || '')}">${i + 1}</a>`).join('　');
+    const ids = g.listings.map(l => l.id).join(',');
     return `<tr>
+      <td class="col-check no-print"><input type="checkbox" class="rowchk" data-ids="${ids}"></td>
       ${withComm ? `<td>${esc(g.listings[0]._comm || g.community || '—')}</td><td class="num">${g.listings[0]._dist !== null && g.listings[0]._dist !== undefined ? g.listings[0]._dist + 'm' : '—'}</td>` : ''}
       <td class="num">${g.floor ? g.floor + (g.floorTotal ? '/' + g.floorTotal : '') : '<span class="miss">—</span>'}</td>
       <td class="num">${g.size !== null ? g.size + '坪' : '<span class="miss">—</span>'}</td>
@@ -401,21 +433,24 @@ function rowsHTML(groups, withComm){
       <td class="num">${g.minPrice !== null ? fmtW(g.minPrice) + (g.count > 1 ? '<span class="badge-n">' + g.count + ' 家刊登</span>' : '') : '<span class="miss">—</span>'}</td>
       <td class="num">${g.unit !== null ? g.unit.toFixed(1) : '<span class="miss">—</span>'}</td>
       <td class="col-link">${links}</td>
+      <td class="col-del no-print"><button class="btn-del" data-del="${ids}" title="剔除這一戶">✕</button></td>
     </tr>`;
   }).join('');
 }
 function meRowHTML(myUnit){
   return `<tr class="me">
+    <td class="col-check no-print"></td>
     <td class="num"><span class="me-tag">本案</span> ${MY.floor ? MY.floor + 'F' : '—'}</td>
     <td class="num">${MY.size !== null ? MY.size + '坪' : '—'}</td>
     <td class="num">—</td><td>—</td>
     <td class="num">${MY.price !== null ? fmtW(MY.price) : '—'}</td>
     <td class="num">${myUnit !== null ? myUnit.toFixed(1) : '—'}</td>
     <td class="col-link"></td>
+    <td class="col-del no-print"></td>
   </tr>`;
 }
-const TH_MINE = '<tr><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th></tr>';
-const TH_NEAR = '<tr><th>社區</th><th>距離</th><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th></tr>';
+const TH_MINE = '<tr><th class="col-check no-print"></th><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th><th class="col-del no-print"></th></tr>';
+const TH_NEAR = '<tr><th class="col-check no-print"></th><th>社區</th><th>距離</th><th>樓層</th><th>權狀</th><th>主建</th><th>格局</th><th>最低開價(萬)</th><th>單價(萬/坪)</th><th class="col-link">刊登連結</th><th class="col-del no-print"></th></tr>';
 
 function render(){
   if (!SEL || !ALL.size){ $('#resSec').style.display = 'none'; $('#pasteStat').textContent = ''; return; }
@@ -423,6 +458,7 @@ function render(){
   const gm = groupUnits591(mine).sort(cmpSort);
   const gn = groupUnits591(near).sort(cmpSort);
   $('#pasteStat').textContent = `已貼 ${pasteCount} 次｜累計 ${ALL.size} 筆刊登 → 本社區 ${mine.length} 筆（歸戶後 ${gm.length} 戶）｜鄰近 ${near.length} 筆｜無法歸類 ${unk.length} 筆`;
+  $('#exNote').innerHTML = EXCLUDED.size ? `已剔除 ${EXCLUDED.size} 筆　<a href="#" class="restore-ex">全部復原</a>` : '';
   $('#resSec').style.display = 'block';
 
   /* 摘要 */
