@@ -30,6 +30,15 @@
   .ac-item .li-tag{float:right;font-size:12px;color:var(--ink-soft)}
   .hint{font-size:12.5px;color:var(--ink-soft);margin-top:10px;line-height:1.7}
 
+  /* ── 快抓書籤安裝區 ── */
+  .bmk-box{margin:0 0 12px;border:1px dashed var(--line);border-radius:12px;background:#fff;padding:0 14px}
+  .bmk-box summary{cursor:pointer;padding:12px 0;font-weight:700;font-size:14px;color:var(--teal)}
+  .bmk-body{padding:0 0 14px;font-size:13.5px;line-height:1.8;color:var(--ink-soft)}
+  .bmk-body p{margin:6px 0}
+  .bmk-btn{display:inline-block;padding:8px 16px;background:var(--clay);color:#fff;border-radius:10px;
+    font-weight:700;text-decoration:none;cursor:grab;box-shadow:var(--shadow)}
+  .bmk-note{font-size:12.5px;color:var(--ink-soft)}
+
   /* ── 蒐集區：591 連結與貼上框 ── */
   .src-links{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 4px}
   .near-list{margin-top:10px}
@@ -133,9 +142,18 @@
 
   <!-- 第 2 步：開 591 複製、貼回來 -->
   <section class="panel search no-print" id="srcSec" style="display:none">
+    <!-- 第一次使用才要做：把快抓書籤拖到書籤列（一次性） -->
+    <details class="bmk-box">
+      <summary>📌 第一次使用：安裝「591 快抓」書籤（只做一次）</summary>
+      <div class="bmk-body">
+        <p>把下面這顆按鈕<b>拖曳</b>到瀏覽器的<b>書籤列</b>（我的最愛列）。裝好後，在 591 清單頁點一下它，就會自動把整頁物件複製好，回本頁貼上即可，不必再 Ctrl+A。</p>
+        <p><a class="bmk-btn" id="bmkLink" href="#" onclick="return false">📌 591 快抓</a> ← 拖我到書籤列</p>
+        <p class="bmk-note">看不到書籤列？在瀏覽器按 <b>Ctrl+Shift+B</b> 打開。太太的電腦也是拖這一次就好；之後工具更新，書籤不用重拖。</p>
+      </div>
+    </details>
     <div class="src-links">
       <a class="btn" id="openMine" href="#" target="_blank" rel="noopener">開 591</a>
-      <span class="hint" style="margin:0">→ 在 591 清單頁 <b>Ctrl+A</b> 全選、<b>Ctrl+C</b> 複製 → 回到本頁 <b>Ctrl+V</b> 貼上；有第二頁就翻頁重複，會自動累加去重。</span>
+      <span class="hint" style="margin:0">→ 在 591 清單頁點<b>「📌 591 快抓」書籤</b>（或 <b>Ctrl+A</b> 全選複製）→ 回本頁 <b>Ctrl+V</b> 貼上；多頁就翻頁重點一次，會自動累加去重。</span>
     </div>
     <div class="near-list" id="nearBox"></div>
     <div class="pills" id="radiusPills">
@@ -285,9 +303,14 @@ document.querySelectorAll('#radiusPills .pill').forEach(b => b.addEventListener(
 document.addEventListener('paste', e => {
   if (!SEL) return;
   e.preventDefault();
-  const html = e.clipboardData.getData('text/html');
+  /* 兩種來源都吃：
+     ① 手動 Ctrl+A/C：帶 text/html。
+     ② 快抓書籤：把整頁 HTML 以純文字放剪貼簿、開頭加 LK591HTML 記號。 */
+  let html = e.clipboardData.getData('text/html');
+  const plain = e.clipboardData.getData('text/plain') || '';
+  if (!html && plain.startsWith('LK591HTML')) html = plain.slice(plain.indexOf('\n') + 1);
   if (!html){
-    $('#pasteStat').textContent = '⚠ 這次貼上沒有帶網頁格式，請直接在 591 頁面 Ctrl+A、Ctrl+C 再回來貼。';
+    $('#pasteStat').textContent = '⚠ 這次貼上沒有抓到內容。請在 591 清單頁按「快抓書籤」，或改用 Ctrl+A、Ctrl+C 再回來貼。';
     return;
   }
   pasteCount++; rawPastes.push(html);
@@ -438,6 +461,24 @@ function render(){
 }
 
 $('#printBtn').addEventListener('click', () => window.print());
+
+/* ── 快抓書籤：這個函式的原始碼會被轉成 bookmarklet 掛到安裝按鈕上 ──
+   在 591 清單頁執行：讀整頁 HTML → 加 LK591HTML 記號放進剪貼簿 → 提示回本頁貼上。
+   真正的解析在工具頁 parse591，所以 591 改版多半只改工具頁，書籤不必重拖。 */
+function lk591grab(){
+  try{
+    var html=document.body.innerHTML;
+    var m=html.match(/house\/detail\/\d+\/(\d+)/g)||[];
+    var ids={};m.forEach(function(s){ids[s.split('/').pop()]=1;});
+    var n=Object.keys(ids).length;
+    if(!n){alert('這一頁沒有偵測到 591 物件，請確認在「出售物件清單頁」再點一次。');return;}
+    var p='LK591HTML\n'+html;
+    var ok=function(){alert('✅ 已複製本頁 '+n+' 個物件，回「競品比較」頁按 Ctrl+V 貼上。');};
+    var ex=function(){var t=document.createElement('textarea');t.value=p;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();var r=false;try{r=document.execCommand('copy');}catch(e){}document.body.removeChild(t);r?ok():alert('自動複製失敗，請改用 Ctrl+A 全選、Ctrl+C 複製。');};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(p).then(ok,ex);}else{ex();}
+  }catch(e){alert('發生錯誤：'+e);}
+}
+$('#bmkLink').setAttribute('href','javascript:('+lk591grab.toString().replace(/\n\s*/g,'')+')();void(0)');
 
 /* 深連結：?c=社區名（例如從行情頁或 LINE 帶過來） */
 (function(){
