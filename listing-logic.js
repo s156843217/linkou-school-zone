@@ -107,6 +107,7 @@ function parse591CardText(text){
      沒寫權狀的（如廣告卡「44.1坪」）就抓一般坪數，但要避開主建與車位 */
   const km = t.match(/權狀\s*([\d,.]+)\s*坪/);
   const mainm = t.match(/主建\s*([\d,.]+)\s*坪/);
+  const pkm = t.match(/車位\s*([\d,.]+)\s*坪/);   // 車位坪：拆算單價用
   const t2 = t.replace(/(主建|車位)\s*[\d,.]+\s*坪/g, ' ');
   const sm = km || t2.match(/([\d,]+(?:\.\d+)?)\s*坪/);
 
@@ -133,6 +134,7 @@ function parse591CardText(text){
     unitPrice: um ? num(um[1]) : null,
     size: sm ? num(sm[1]) : null,
     sizeMain: mainm ? num(mainm[1]) : null,
+    sizePark: pkm ? num(pkm[1]) : null,
     layout: lm ? lm[0].replace(/\s+/g, '') : null,
     floor: fm ? fm[1] + 'F' : null,
     floorTotal: fm ? fm[2] + 'F' : null,
@@ -142,7 +144,7 @@ function parse591CardText(text){
 
 /* 有幾個欄位有抓到值（用來在重複連結之間挑資訊最齊的那筆） */
 function fieldCount591(it){
-  return ['title','price','unitPrice','size','sizeMain','layout','floor','age','community']
+  return ['title','price','unitPrice','size','sizeMain','sizePark','layout','floor','age','community']
     .reduce((n, k) => n + (it[k] !== null && it[k] !== undefined ? 1 : 0), 0);
 }
 
@@ -232,6 +234,24 @@ function nearby591(name, radius){
   return out.sort((a, b) => a.dist - b.dist);
 }
 
+/* 591 單價疑似「沒拆車位」的自動判斷：
+   刊登者有填車位價時 591 會自動拆算（單價會高於 總價÷權狀坪）；
+   反過來說，卡片看得到車位坪、單價卻 ≈ 總價÷權狀坪（誤差 2% 內），
+   就代表刊登者沒填車位價、591 沒拆 → 這筆單價偏低，提醒人工填車位價修正。 */
+function looksUnsplit591(price, size, unit, sizePark){
+  if (price === null || size === null || unit === null || sizePark === null || !size) return false;
+  const raw = price / size;
+  return raw > 0 && Math.abs(unit - raw) / raw < 0.02;
+}
+
+/* 拆算單價（萬/坪）：(總價 − 車位價) ÷ (權狀坪 − 車位坪)。
+   總價或坪數缺、或扣完剩 0 以下（車位數字填錯）→ 回 null，讓畫面退回原單價。 */
+function adjUnit591(price, size, parkPrice, parkSize){
+  if (price === null || size === null) return null;
+  const pr = price - (parkPrice || 0), sz = size - (parkSize || 0);
+  return (pr > 0 && sz > 0) ? pr / sz : null;
+}
+
 function median591(arr){
   if (!arr.length) return null;
   const a = [...arr].sort((x, y) => x - y), m = Math.floor(a.length / 2);
@@ -273,11 +293,13 @@ function groupUnits591(items){
   return Array.from(map.values()).map(ls => {
     ls.sort((a, b) => (a.price === null) - (b.price === null) || a.price - b.price);
     const best = ls[0];   // 開價最低的那筆當代表
+    const sp = ls.map(l => l.sizePark).find(v => v !== null && v !== undefined);   // 車位坪：組內任一筆有寫就用
     return {
       listings: ls, count: ls.length,
       minPrice: best.price, unit: best.unitPrice,
       floor: best.floor, floorTotal: best.floorTotal,
       size: best.size, sizeMain: best.sizeMain,
+      sizePark: sp === undefined ? null : sp,
       layout: best.layout, age: best.age, community: best.community
     };
   });
