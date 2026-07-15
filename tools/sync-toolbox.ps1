@@ -39,6 +39,10 @@ $files = @(
     "report/index.html",
     "report/qrcode.js",
     "share/index.html",
+    "listing/index.html",
+    "listing-logic.js",
+    "community-doors.js",
+    "qrcode.js",
     "report-logic.js",
     "internal-nav.js",
     "about/index.html"
