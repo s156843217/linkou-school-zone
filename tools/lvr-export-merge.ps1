@@ -170,6 +170,29 @@ foreach ($f in (Get-ChildItem $dir -Filter '*.xlsx' | Sort-Object Name)) {
 $sorted = $all | Sort-Object 日期序, 門牌
 $sorted | Export-Csv -Path $outCsv -NoTypeInformation -Encoding UTF8
 
+# --- 對照庫輸入檔：社區↔門牌(含出現次數)，供 tools/build-community-doors.html 產生 COMM_DOORS ---
+# 段的寫法先正規化（官方偶有「1段」「ㄧ段(注音)」的髒寫法），門牌解析交給網站的 parseHouse 做
+$pairs = @{}
+foreach ($r in $all) {
+    if (-not $r.社區) { continue }
+    $addr = $r.門牌 -replace 'ㄧ段', '一段' -replace '1段', '一段' -replace '2段', '二段' -replace '3段', '三段'
+    $key = $r.社區 + "`t" + $addr
+    if ($pairs.ContainsKey($key)) { $pairs[$key]++ } else { $pairs[$key] = 1 }
+}
+$sb = New-Object System.Text.StringBuilder
+[void]$sb.AppendLine('// doors-input.js — 由 tools/lvr-export-merge.ps1 自動產生，勿手改')
+[void]$sb.AppendLine('// 格式：[官方社區簡稱, 門牌(段已正規化), 出現次數]')
+[void]$sb.AppendLine('const DOORS_INPUT=[')
+foreach ($k in ($pairs.Keys | Sort-Object)) {
+    $parts = $k -split "`t"
+    $c = $parts[0] -replace '\\', '\\\\' -replace '"', '\"'
+    $a = $parts[1] -replace '\\', '\\\\' -replace '"', '\"'
+    [void]$sb.AppendLine("[""$c"",""$a"",$($pairs[$k])],")
+}
+[void]$sb.AppendLine('];')
+$doorsOut = Join-Path $dir 'doors-input.js'
+[System.IO.File]::WriteAllText($doorsOut, $sb.ToString(), [System.Text.UTF8Encoding]::new($true))
+
 # --- 統計報告 ---
 Write-Output "===== 各檔統計 ====="
 $fileStats | Format-Table -AutoSize | Out-String -Width 200 | Write-Output
@@ -180,6 +203,7 @@ $commList = $all | Where-Object { $_.社區 } | Group-Object 社區
 Write-Output "總筆數：$total（跨檔重複剔除 $dupCount 筆）"
 Write-Output ("有社區簡稱：{0} 筆（{1:P1}），共 {2} 個社區" -f $withComm, ($withComm / $total), $commList.Count)
 Write-Output "輸出：$outCsv"
+Write-Output "對照庫輸入：$doorsOut（$($pairs.Count) 個社區×門牌組合）"
 if ($badFiles.Count -gt 0) {
     Write-Output "⚠ 無資料/異常檔案：$($badFiles -join '、')"
 }
