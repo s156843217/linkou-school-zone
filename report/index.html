@@ -197,6 +197,14 @@ if(location.protocol==='https:'){
           <input type="text" id="addrInput" placeholder="例：文化二路一段68號" autocomplete="off">
         </div>
         <div class="field small">
+          <label class="lbl">型態（地址用）</label>
+          <select id="addrType"><!-- 值＝price-list-data 的 PRICE_BT 索引；行情抓鄰近「同型態」成交 -->
+            <option value="2" selected>公寓</option>
+            <option value="1">華廈</option>
+            <option value="0">住宅大樓</option>
+          </select>
+        </div>
+        <div class="field small">
           <label class="lbl">物件總價（萬）</label>
           <input type="number" id="inPrice" placeholder="例：1500" min="0" step="10">
         </div>
@@ -302,9 +310,21 @@ function renderReport(d){
         <div class="mi"><div class="mv">${cp.sizeMed.toFixed(1)} 坪</div><div class="mk">坪數中位(含車位)</div></div>
         ${d.zoneData?`<div class="mi"><div class="mv">${d.zoneData.medPrice}</div><div class="mk">商圈中位(萬/坪)</div></div>`:''}
       </div>`;
+  }else if(d.nearType&&!d.nearType.insufficient){
+    const nt=d.nearType;   // 地址模式：鄰近同型態成交（公寓/華廈不被大樓價拉高）
+    mktHtml=`<div style="font-size:10.5px;color:var(--ink-soft)">鄰近 ${nt.radius}m 內<b style="color:var(--ink)">${nt.btName}</b>：近 ${nt.yrs} 年 <b style="color:var(--ink)">${nt.n}</b> 筆成交${d.zoneData?`・${d.zoneData.name.replace(/商圈$/,'')}商圈`:''}</div>
+      <div class="mkt-big"><span class="v">${nt.unitMed.toFixed(1)}</span><span class="u">萬/坪（同型態中位數，不含車位）</span></div>
+      <div class="mkt-meta">
+        <div class="mi"><div class="mv">${nt.p25.toFixed(1)}–${nt.p75.toFixed(1)}</div><div class="mk">主力區間(萬/坪)</div></div>
+        <div class="mi"><div class="mv">${fmt(nt.totalMed)} 萬</div><div class="mk">總價中位</div></div>
+        <div class="mi"><div class="mv">${nt.sizeMed.toFixed(1)} 坪</div><div class="mk">坪數中位(含車位)</div></div>
+        ${d.zoneData?`<div class="mi"><div class="mv">${d.zoneData.medPrice}</div><div class="mk">商圈中位(萬/坪)</div></div>`:''}
+      </div>`;
   }else if(d.zoneData){
     const z=d.zoneData;
-    const few=(d.commPrice&&d.commPrice.insufficient)
+    const few=(d.nearType&&d.nearType.insufficient)
+      ?`鄰近 500 公尺內${d.nearType.btName}近 3 年成交僅 <b>${d.nearType.n}</b> 筆，樣本過少不列統計；改列所在商圈行情。`
+      :(d.commPrice&&d.commPrice.insufficient)
       ?`本案近 3 年實價登錄僅 <b>${d.commPrice.n}</b> 筆，樣本過少不列統計；改列所在商圈行情。`:'';
     mktHtml=`<div style="font-size:10.5px;color:var(--ink-soft)">${few}所在商圈：<b style="color:var(--ink)">${z.name}</b>（近一年 ${z.count} 筆成交）</div>
       <div class="mkt-big"><span class="v">${z.medPrice}</span><span class="u">萬/坪（商圈中位數，不含車位）</span></div>
@@ -401,7 +421,7 @@ function renderReport(d){
     </div>
     <div class="rp-disc">
       ⚠️ 本報告由林口置產工具箱自動彙整，僅供帶看參考：學區資料具時效性，額滿與分發以當年度學校及區公所公告為準；
-      行情為實價登錄統計（樣本足夠時列本社區近一至三年中位數，否則列商圈近一年；不含車位、排除透天與特殊交易），非個案估價；房貸試算不代表銀行核貸條件。重大決策請洽專業人士確認。
+      行情為實價登錄統計（樣本足夠時列本社區或鄰近同型態之近一至三年中位數，否則列商圈近一年；不含車位、排除透天與特殊交易），非個案估價；房貸試算不代表銀行核貸條件。重大決策請洽專業人士確認。
     </div>`;
   $("#sheet").classList.add('on');
   drawMiniMap(d);
@@ -512,7 +532,7 @@ function loanParams(){
 let lastData=null;   // 最後一次產生的報告資料（LINE 分享用）
 function runReport(){
   if(!cur)return;
-  const d=cur.type==='addr'?buildFromAddress(cur.value,loanParams()):buildFromCommunity(cur.value,loanParams());
+  const d=cur.type==='addr'?buildFromAddress(cur.value,loanParams(),parseInt($("#addrType").value)):buildFromCommunity(cur.value,loanParams());
   if(!d){toast('查無資料');return;}
   lastData=d;
   renderReport(d);
@@ -525,14 +545,16 @@ function liffShareUrl(){
   const p=loanParams();
   return 'https://liff.line.me/2010606487-Km5pYNnK?'
        +(cur.type==='addr'?'a=':'c=')+encodeURIComponent(cur.value)
-       +(p.price>0?'&p='+p.price:'');
+       +(p.price>0?'&p='+p.price:'')
+       +(cur.type==='addr'?'&t='+$("#addrType").value:'');   // 地址模式帶型態，分享頁才算得出同型態行情
 }
 
 /* LINE 分享：組客戶版分享頁網址＋重點摘要文字，跳 LINE 選人傳送 */
 function shareUrl(){
   const p=loanParams();
   return SITE_URL+'share/?'+(cur.type==='addr'?'a=':'c=')+encodeURIComponent(cur.value)
-       +(p.price>0?'&p='+p.price:'');
+       +(p.price>0?'&p='+p.price:'')
+       +(cur.type==='addr'?'&t='+$("#addrType").value:'');   // 地址模式帶型態，分享頁才算得出同型態行情
 }
 function shareText(d){
   let t=`【${d.name}】林口置產情報\n`;
@@ -541,6 +563,7 @@ function shareText(d){
     t+=`🏫 國小：${rl.base||('自由學區 '+(rl.free||[]).join('/'))}${rl.base&&FULL_ES.includes(rl.base)?'（額滿校，須提早設籍）':''}\n`;
   }
   if(d.commPrice&&!d.commPrice.insufficient)t+=`📈 本社區行情中位 ${d.commPrice.unitMed.toFixed(1)} 萬/坪（近${d.commPrice.yrs}年 ${d.commPrice.n} 筆）\n`;
+  else if(d.nearType&&!d.nearType.insufficient)t+=`📈 鄰近${d.nearType.btName}行情中位 ${d.nearType.unitMed.toFixed(1)} 萬/坪（${d.nearType.radius}m內近${d.nearType.yrs}年 ${d.nearType.n} 筆）\n`;
   else if(d.zoneData)t+=`📈 ${d.zoneData.name}行情中位 ${d.zoneData.medPrice} 萬/坪（近一年）\n`;
   if(d.mortgage)t+=`🏦 總價 ${fmt(d.mortgage.price)} 萬，${d.mortgage.ratio*100/10} 成 ${d.mortgage.years} 年月付約 ${fmt(d.mortgage.monthly)} 元\n`;
   t+=`👉 學區/行情/公車地圖 完整看：\n${shareUrl()}\n`;
@@ -581,7 +604,7 @@ function shareText(d){
     if(e.key==='Enter'&&e.target.value.trim())pickAddr(e.target.value.trim());
   });
   ['inPrice','inRate'].forEach(id=>$('#'+id).addEventListener('input',runReport));
-  ['inRatio','inYears'].forEach(id=>$('#'+id).addEventListener('change',runReport));
+  ['inRatio','inYears','addrType'].forEach(id=>$('#'+id).addEventListener('change',runReport));
   $("#btnGo").addEventListener('click',()=>{
     const a=$("#addrInput").value.trim();
     if(a){pickAddr(a);return;}                 // 地址格有填 → 走地址模式
@@ -602,8 +625,9 @@ function shareText(d){
     if(!lastData||!cur){e.preventDefault();toast('請先產生報告再分享');}
   });
 
-  // 網址帶入（CRM 之後就用這個串接：?c=社區名 或 ?a=地址，加 &p=總價萬）
+  // 網址帶入（CRM 之後就用這個串接：?c=社區名 或 ?a=地址，加 &p=總價萬、&t=型態索引）
   if(q.get('p'))$("#inPrice").value=q.get('p');
+  if(['0','1','2'].includes(q.get('t')))$("#addrType").value=q.get('t');
   const cParam=q.get('c'), aParam=q.get('a');
   if(aParam){
     $("#addrInput").value=aParam; pickAddr(aParam);

@@ -134,6 +134,40 @@ function commPriceStats(keys,commName){
     }
   }
 }
+/* ── 地址模式（公寓/華廈等）的鄰近「同建物型態」行情 ──
+   商圈中位數以住宅大樓為大宗，公寓/華廈直接看會嚴重高估
+   （實測：舊市區公寓約 24.5 萬/坪 vs 商圈中位 38.6），
+   所以地址模式改抓「方圓內同型態成屋」統計：範圍自動放寬 150→300→500m、
+   期間 1→3 年（先求近再求新），湊滿 5 筆統計樣本就停；
+   500m 內近 3 年仍不足 5 筆回 {insufficient:true}，頁面退回商圈級並誠實說明。 */
+function nearTypeStats(coord,bt){
+  if(typeof PRICE_ROWS==='undefined'||!coord||bt==null)return null;
+  const iK=PRICE_COLS.indexOf('k'),iD=PRICE_COLS.indexOf('d'),iA=PRICE_COLS.indexOf('a'),
+        iBt=PRICE_COLS.indexOf('bt'),iT=PRICE_COLS.indexOf('t'),iU=PRICE_COLS.indexOf('u'),
+        iS=PRICE_COLS.indexOf('s');
+  const md=PRICE_META.maxDate;
+  const rows=[];                                   // 一趟掃描先收 500m 內同型態成屋
+  for(const r of PRICE_ROWS){
+    if(r[iK]!=='r'||r[iBt]!==bt||r[iU]<=0)continue;
+    if(r[iD]<md-30000)continue;
+    const co=houseCoord(r[iA]); if(!co)continue;
+    const dm=distM(coord.lat,coord.lon,co.lat,co.lon);
+    if(dm<=500)rows.push({r,dm});
+  }
+  if(!rows.length)return {insufficient:true,n:0,btName:PRICE_BT[bt]};
+  for(const radius of [150,300,500]){
+    for(const yrs of [1,2,3]){
+      const st=rows.filter(o=>o.dm<=radius&&o.r[iD]>=md-yrs*10000);
+      if(st.length>=5){
+        const us=st.map(o=>o.r[iU]);
+        return {n:st.length,yrs,radius,btName:PRICE_BT[bt],
+          unitMed:_median(us),p25:_quart(us,.25),p75:_quart(us,.75),
+          totalMed:_median(st.map(o=>o.r[iT])),sizeMed:_median(st.map(o=>o.r[iS]))};
+      }
+    }
+  }
+  return {insufficient:true,n:rows.length,btName:PRICE_BT[bt]};
+}
 function distM(la1,lo1,la2,lo2){
   const R=6371000,rad=Math.PI/180;
   const dLa=(la2-la1)*rad,dLo=(lo2-lo1)*rad;
@@ -216,6 +250,7 @@ function finishReport(core,loan){
   const zoneData=zone?LINKOU_ZONES.find(z=>z.name===zone):null;
   const resale=(typeof LINKOU_TYPES!=='undefined')?LINKOU_TYPES.find(t=>t.key==='resale'):null;
   const commPrice=commPriceStats(core.doorKeys||null,core.presaleQ||null);   // 社區級行情（資料不足時為 null 或 insufficient）
+  const nearType=(core.addrBt!=null&&coord)?nearTypeStats(coord,core.addrBt):null;   // 地址模式的鄰近同型態行情
   const school=core.li?resolve(core.li,core.lin):null;
   const stops=coord?nearStops(coord.lat,coord.lon,500):[];
   let mortgage=null;
@@ -228,7 +263,7 @@ function finishReport(core,loan){
       per100:pmtMonthly(100,loan.rate,loan.years)
     };
   }
-  return Object.assign({zone,zoneData,resale,commPrice,school,stops,mortgage},core);
+  return Object.assign({zone,zoneData,resale,commPrice,nearType,school,stops,mortgage},core);
 }
 /* 社區模式：名稱查 COMMUNITY */
 function buildFromCommunity(name,loan){
@@ -239,8 +274,9 @@ function buildFromCommunity(name,loan){
     doorKeys:commDoorSet(name), presaleQ:name    // 社區級行情比對用：整串門牌＋建案名稱
   },loan);
 }
-/* 地址模式（公寓／華廈等無社區名）：門牌表直接給里＋鄰，學區精準到鄰 */
-function buildFromAddress(addr,loan){
+/* 地址模式（公寓／華廈等無社區名）：門牌表直接給里＋鄰，學區精準到鄰。
+   bt＝建物型態索引（PRICE_BT：0大樓/1華廈/2公寓…），有給才算鄰近同型態行情 */
+function buildFromAddress(addr,loan,bt){
   const h=houseLookup(addr); if(!h)return null;
   const one=h.cands.length===1?h.cands[0]:null;   // 單一里鄰＝可精準判學區；跨里則列候選
   const disp=toHalf(addr).replace(/^(新北市)?林口區/,'').trim();
@@ -250,7 +286,8 @@ function buildFromAddress(addr,loan){
     li:one?one.li:null, lin:one?one.lin:null,
     cands:one?null:h.cands.map(c=>c.li),
     coord:h.lat!=null?{lat:h.lat,lon:h.lon}:null,
-    doorKeys:p?new Set([p.road+'|'+p.lk+'|'+p.num.split('-')[0]]):null, presaleQ:null
+    doorKeys:p?new Set([p.road+'|'+p.lk+'|'+p.num.split('-')[0]]):null, presaleQ:null,
+    addrBt:(bt==null||isNaN(bt))?null:bt
   },loan);
 }
 
